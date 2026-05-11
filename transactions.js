@@ -17,9 +17,11 @@ async function renderTransactions() {
                     <button onclick="openTransferModal()" class="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30 border border-blue-500 text-sm">
                         <i class="fa-solid fa-exchange-alt"></i> Transfer
                     </button>
+                    ${window.currentUnit === 'Main' ? `
                     <button onclick="window.openFuneralModal()" class="flex-1 md:flex-none bg-gray-800 hover:bg-black text-white px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 shadow-lg shadow-gray-500/30 text-sm">
                         <i class="fa-solid fa-cross"></i> Deaths
                     </button>
+                    ` : ''}
                 </div>
             </div>
             
@@ -72,7 +74,9 @@ async function loadTransactionsTable() {
         query = query.where('date').between(startDate, endDate, true, true);
     }
 
-    const transactions = (await query.toArray()).reverse();
+    let transactions = await query.toArray();
+    // Filter by Current Unit
+    transactions = transactions.filter(t => (t.unit || 'Main') === window.currentUnit).reverse();
 
     if (transactions.length === 0) {
         tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-gray-400">No transactions found.</td></tr>`;
@@ -150,6 +154,24 @@ async function loadTransactionsTable() {
 // Ensure options reference is globally accessible for dynamic injection
 window.txGlobalAccountOptions = '';
 
+window.getNextReferenceNumber = async (prefix) => {
+    try {
+        const txs = await db.transactions.toArray();
+        let max = 0;
+        txs.forEach(t => {
+            if (t.reference && t.reference.startsWith(prefix)) {
+                const numPart = t.reference.substring(prefix.length);
+                const num = parseInt(numPart);
+                if (!isNaN(num) && num > max) max = num;
+            }
+        });
+        return prefix + String(max + 1).padStart(6, '0');
+    } catch (err) {
+        console.error(err);
+        return prefix + '000001';
+    }
+};
+
 window.addTxLineRow = (preSelectedAccountId = null) => {
     const container = document.getElementById('txLinesContainer');
     if (!container) return;
@@ -187,7 +209,7 @@ window.calculateTxTotal = () => {
 
 window.openTransactionModal = async (type) => {
     // type is 'Receipt' or 'Payment'
-    const accounts = await db.accounts.toArray();
+    const accounts = (await db.accounts.toArray()).filter(a => (a.unit || 'Main') === window.currentUnit);
     const members = await db.members.toArray();
 
     const cashBankAccounts = accounts.filter(a =>
@@ -216,7 +238,7 @@ window.openTransactionModal = async (type) => {
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Reference No</label>
-                    <input type="text" id="txRef" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all placeholder-gray-400" placeholder="e.g. REC-001">
+                    <input type="text" id="txRef" ${window.currentUnit === 'Main' ? 'readonly' : ''} class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 outline-none transition-all font-bold text-brand-600 ${window.currentUnit === 'Main' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white cursor-text'}" placeholder="e.g. AR000001">
                 </div>
             </div>
             
@@ -275,17 +297,31 @@ window.openTransactionModal = async (type) => {
 
     window.utils.showModal(html);
 
-    // Inject at least one line immediately
-    requestAnimationFrame(() => {
+    // Inject at least one line immediately and auto-fill reference
+    requestAnimationFrame(async () => {
+        const prefix = type === 'Receipt' ? 'AR' : 'PV';
+        const isMain = window.currentUnit === 'Main';
+        const nextRef = isMain ? await window.getNextReferenceNumber(prefix) : '';
+        const refInput = document.getElementById('txRef');
+        if (refInput) {
+            refInput.value = nextRef;
+            if (!isMain) refInput.placeholder = "Enter Reference Number";
+        }
+
         if (type === 'Receipt') {
-            const welfarAcc = accounts.find(a => a.accountName && a.accountName.includes('සුභ සාධක අරමුදල්'));
-            const memberAcc = accounts.find(a => a.accountName && a.accountName.includes('සාමාජික අරමුදල්'));
+            const isSAP = window.currentUnit === 'SAP';
+            const welfarAcc = accounts.find(a => a.accountName && a.accountName.includes(isSAP ? 'SAP මුදල් පොත' : 'සුභ සාධක අරමුදල්'));
+            const memberAcc = accounts.find(a => a.accountName && a.accountName.includes(isSAP ? 'සිතුමිණ තැන්පත් ගිණුම' : 'සාමාජික අරමුදල්'));
             const contributionAcc = accounts.find(a => a.accountName && a.accountName.includes('දායක අරමුදල්'));
 
             if (welfarAcc || memberAcc || contributionAcc) {
-                if (welfarAcc) window.addTxLineRow(welfarAcc.id);
-                if (memberAcc) window.addTxLineRow(memberAcc.id);
-                if (contributionAcc) window.addTxLineRow(contributionAcc.id);
+                if (isSAP) {
+                    if (welfarAcc) window.addTxLineRow(welfarAcc.id);
+                } else {
+                    if (welfarAcc) window.addTxLineRow(welfarAcc.id);
+                    if (memberAcc) window.addTxLineRow(memberAcc.id);
+                    if (contributionAcc) window.addTxLineRow(contributionAcc.id);
+                }
             } else {
                 window.addTxLineRow();
             }
@@ -346,6 +382,7 @@ window.saveTransaction = async (e, type, printAfter = false) => {
             otherName: otherName,
             description: desc,
             userId: window.auth.session ? window.auth.session.id : null,
+            unit: window.currentUnit,
             status: 'Active'
         });
 
@@ -386,7 +423,7 @@ window.saveTransaction = async (e, type, printAfter = false) => {
 };
 
 window.openTransferModal = async () => {
-    const accounts = await db.accounts.toArray();
+    const accounts = (await db.accounts.toArray()).filter(a => (a.unit || 'Main') === window.currentUnit);
     const cashBankAccounts = accounts.filter(a => (a.accountName && (a.accountName.toLowerCase().includes('cash') || a.accountName.toLowerCase().includes('bank') || a.accountName.includes('මුදල් පොත') || a.accountName.includes('තැන්පතු'))) || a.category === 'Current Asset');
 
     let cbOptions = '<option value="" disabled selected>Select Account</option>';
@@ -405,7 +442,7 @@ window.openTransferModal = async () => {
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Reference No</label>
-                    <input type="text" id="tRef" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all placeholder-gray-400" placeholder="e.g. TRF-001">
+                    <input type="text" id="tRef" readonly class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 outline-none transition-all font-bold text-blue-600 bg-gray-100 cursor-not-allowed" placeholder="e.g. TRF-001">
                 </div>
             </div>
             
@@ -447,6 +484,13 @@ window.openTransferModal = async () => {
     `;
 
     window.utils.showModal(html);
+
+    // Auto-fill reference
+    requestAnimationFrame(async () => {
+        const nextRef = await window.getNextReferenceNumber('TRF');
+        const refInput = document.getElementById('tRef');
+        if (refInput) refInput.value = nextRef;
+    });
 };
 
 window.saveTransfer = async (e) => {
@@ -471,7 +515,10 @@ window.saveTransfer = async (e) => {
             reference: ref,
             memberId: null,
             otherName: null,
-            description: desc || 'Inter-Account Transfer'
+            description: desc || 'Inter-Account Transfer',
+            unit: window.currentUnit,
+            userId: window.auth.session ? window.auth.session.id : null,
+            status: 'Active'
         });
 
         await db.entries.bulkAdd([
@@ -505,10 +552,10 @@ window.printTransaction = async (id) => {
         const creditEntries = entries.filter(e => e.credit > 0);
         total = creditEntries.reduce((a, e) => a + e.credit, 0);
         linesHtml = creditEntries.map(e => `
-            <tr>
-                <td class="pt-1 pb-1 text-left align-top leading-tight" style="padding-right: 4px;">${accMap[e.accountId]?.accountName || 'Unknown'}</td>
-                <td class="pt-1 pb-1 text-right align-top leading-tight whitespace-nowrap">${e.credit.toFixed(2)}</td>
-            </tr>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 2px 0;">
+                <div style="padding-right: 10px;">${accMap[e.accountId]?.accountName || 'Unknown'}</div>
+                <div style="font-weight: bold; white-space: nowrap;">${e.credit.toFixed(2)}</div>
+            </div>
         `).join('');
     } else if (tx.type === 'Transfer') {
         const debitEntry = entries.find(e => e.debit > 0);
@@ -528,10 +575,10 @@ window.printTransaction = async (id) => {
         const debitEntries = entries.filter(e => e.debit > 0);
         total = debitEntries.reduce((a, e) => a + e.debit, 0);
         linesHtml = debitEntries.map(e => `
-            <tr>
-                <td class="pt-1 pb-1 text-left align-top leading-tight" style="padding-right: 4px;">${accMap[e.accountId]?.accountName || 'Unknown'}</td>
-                <td class="pt-1 pb-1 text-right align-top leading-tight whitespace-nowrap">${e.debit.toFixed(2)}</td>
-            </tr>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 2px 0;">
+                <div style="padding-right: 10px;">${accMap[e.accountId]?.accountName || 'Unknown'}</div>
+                <div style="font-weight: bold; white-space: nowrap;">${e.debit.toFixed(2)}</div>
+            </div>
         `).join('');
     }
 
@@ -545,9 +592,9 @@ window.printTransaction = async (id) => {
     const title = tx.type === 'Receipt' ? 'RECEIPT' : tx.type === 'Payment' ? 'PAYMENT VOUCHER' : 'TRANSFER VOUCHER';
 
     let arrearsHtml = '';
-    if (tx.memberId && tx.type === 'Receipt') {
+    if (tx.memberId && tx.type === 'Receipt' && (tx.unit || 'Main') === 'Main') {
         const dues = await window.getMemberDues(tx.memberId);
-        const totalArrears = dues.entranceDue + dues.monthlyDue + dues.funeralDue;
+        const totalArrears = dues.entranceDue + dues.monthlyDue + dues.funeralDue + dues.arrearsDue;
         if (totalArrears > 0) {
             arrearsHtml = `
                 <div style="border: 1px solid black; padding: 4px; margin-top: 8px; text-align: center; border-style: double;">
@@ -566,9 +613,9 @@ window.printTransaction = async (id) => {
                 
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid black; padding-bottom: 10mm; margin-bottom: 8mm;">
                     <div>
-                        <h1 style="font-size: 24px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: -1px;">Arunalu Welfare Society</h1>
+                        <h1 style="font-size: 24px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: -1px;">${(tx.unit || 'Main') === 'SAP' ? 'SAP CENTER - ARUNALU' : 'Arunalu Welfare Society'}</h1>
                         <p style="font-size: 12px; color: #444; margin: 2px 0;">Galapitiyagama, Nikaweratiya</p>
-                        <p style="font-size: 10px; font-weight: bold; text-transform: uppercase; color: #666;">Galapitiyagama Sanasa Society - Welfare Branch</p>
+                        <p style="font-size: 10px; font-weight: bold; text-transform: uppercase; color: #666;">${(tx.unit || 'Main') === 'SAP' ? 'SAP CENTER PROJECT - WELFARE BRANCH' : 'Galapitiyagama Sanasa Society - Welfare Branch'}</p>
                     </div>
                     <div style="text-align: right;">
                         <h2 style="font-size: 20px; font-weight: 800; margin: 0;">${title}</h2>
@@ -612,8 +659,8 @@ window.printTransaction = async (id) => {
                     </div>
                     <div style="text-align: center; width: 30%;">
                         <div style="border-top: 1.5px solid black; padding-top: 2mm;">
-                            <div style="font-size: 11px; font-weight: 800;">Treasurer</div>
-                            <div style="font-size: 9px; color: #666;">භාණ්ඩාගාරික</div>
+                            <div style="font-size: 11px; font-weight: 800;">${(tx.unit || 'Main') === 'SAP' ? 'SAP CENTER MANAGER' : 'Treasurer'}</div>
+                            <div style="font-size: 9px; color: #666;">${(tx.unit || 'Main') === 'SAP' ? 'SAP මධ්‍යස්ථාන කළමනාකරු' : 'භාණ්ඩාගාරික'}</div>
                         </div>
                     </div>
                     <div style="text-align: center; width: 30%;">
@@ -648,9 +695,9 @@ window.printTransaction = async (id) => {
             <div style="width: 55mm; max-width: 55mm; margin: 0 auto; padding: 1mm; font-family: 'Inter', 'Iskoola Pota', 'Nirmala UI', sans-serif; font-size: 10px; line-height: 1.2; color: black; background: white;">
                 
                 <div style="text-align: center; margin-bottom: 6px;">
-                    <h1 style="font-size: 13px; font-weight: 900; margin: 0; line-height: 1.1; text-transform: uppercase;">Arunalu Welfare Society</h1>
+                    <h1 style="font-size: 13px; font-weight: 900; margin: 0; line-height: 1.1; text-transform: uppercase;">${(tx.unit || 'Main') === 'SAP' ? 'SAP CENTER - ARUNALU' : 'Arunalu Welfare Society'}</h1>
                     <div style="font-size: 8px; font-weight: bold;">Galapitiyagama, Nikaweratiya</div>
-                    <div style="font-size: 7px; font-weight: bold; color: #333; margin-bottom: 3px; text-transform: uppercase;">Galapitiyagama Sanasa Society <br> Welfare Branch</div>
+                    <div style="font-size: 7px; font-weight: bold; color: #333; margin-bottom: 3px; text-transform: uppercase;">${(tx.unit || 'Main') === 'SAP' ? 'SAP CENTER PROJECT - WELFARE BRANCH' : 'Galapitiyagama Sanasa Society <br> Welfare Branch'}</div>
                     <div style="margin-top: 3px; font-weight: 900; text-decoration: underline; font-size: 14px; letter-spacing: 1px;">${title}</div>
                 </div>
                 
@@ -670,11 +717,9 @@ window.printTransaction = async (id) => {
                     <div style="font-weight: 900; font-size: 11px; line-height: 1.1;">${memberLabel}</div>
                 </div>
 
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 4px; font-size: 10px;">
-                    <tbody>
-                        ${linesHtml}
-                    </tbody>
-                </table>
+                <div style="width: 100%; margin-bottom: 6px; font-size: 10px; border-bottom: 1px dashed #ccc; padding-bottom: 4px;">
+                    ${linesHtml}
+                </div>
 
                 <div style="border-top: 1px solid black; padding: 4px 0; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-weight: 900; font-size: 12px;">TOTAL:</span>
@@ -687,9 +732,9 @@ window.printTransaction = async (id) => {
                     <span style="line-height: 1.1;">${tx.description}</span>
                 </div>` : ''}
 
-                <div style="margin-top: 20px; text-align: center; display: flex; justify-content: space-between; gap: 5px;">
+                <div style="margin-top: 45px; text-align: center; display: flex; justify-content: space-between; gap: 5px;">
                     <div style="border-top: 1px solid black; width: 48%; font-size: 8px; padding-top: 2px; font-weight: bold;">Member/Payer</div>
-                    <div style="border-top: 1px solid black; width: 48%; font-size: 8px; padding-top: 2px; font-weight: bold;">Treasurer</div>
+                    <div style="border-top: 1px solid black; width: 48%; font-size: 8px; padding-top: 2px; font-weight: bold;">${(tx.unit || 'Main') === 'SAP' ? 'Manager' : 'Treasurer'}</div>
                 </div>
 
                 ${arrearsHtml}
@@ -879,7 +924,10 @@ window.submitCancellation = async (e, id) => {
 };
 window.handleTxMemberSelection = async (value) => {
     const container = document.getElementById('duesSummaryContainer');
-    if (!container) return;
+    if (!container || window.currentUnit === 'SAP') {
+        if (container) container.classList.add('hidden');
+        return;
+    }
 
     const members = await db.members.toArray();
     const matched = members.find(m => `${m.memberNo} - ${m.name}` === value || String(m.memberNo) === String(value) || m.name === value);
@@ -890,33 +938,34 @@ window.handleTxMemberSelection = async (value) => {
     }
 
     const dues = await window.getMemberDues(matched.id);
-    const totalDue = dues.entranceDue + dues.monthlyDue + dues.funeralDue;
+    const totalDue = dues.entranceDue + dues.monthlyDue + dues.funeralDue + dues.arrearsDue;
 
     let warningHtml = '';
+    // ... (rest of warning logic) ...
     if (dues.isInvalid) {
         warningHtml = `
             <div class="mb-3 bg-red-50 border border-red-200 rounded-xl p-4">
                 <div class="flex items-center gap-3 text-red-700 mb-3">
                     <i class="fa-solid fa-circle-xmark text-xl animate-pulse"></i>
                     <div>
-                        <div class="font-bold text-sm">සාමාජිකත්වය අවලංගු වී ඇත! (Membership Invalid)</div>
-                        <div class="text-xs opacity-80">මාස 6කට වඩා හිඟ මුදල් පවතී.</div>
+                        <div class="font-bold text-sm uppercase">සාමාජිකත්වය අහෝසි වී ඇත! (Membership Terminated)</div>
+                        <div class="text-xs opacity-80">මාස 6කට වඩා හිඟ මුදල් පවතින බැවින් සාමාජිකත්වය අත්හිටුවා ඇත.</div>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <button type="button" onclick="window.renewMemberMembership(${matched.id})" class="bg-red-600 text-white py-2 rounded-lg font-bold hover:bg-red-700 transition-colors text-[10px] uppercase tracking-wider shadow-md">
                         Renew as New Member (රු. 13,000)
                     </button>
-                    <button type="button" onclick="this.parentElement.parentElement.remove(); window.autoFillDues(${matched.id});" class="bg-amber-600 text-white py-2 rounded-lg font-bold hover:bg-amber-700 transition-colors text-[10px] uppercase tracking-wider shadow-md">
+                    <button type="button" onclick="window.autoFillDues(${matched.id});" class="bg-amber-600 text-white py-2 rounded-lg font-bold hover:bg-amber-700 transition-colors text-[10px] uppercase tracking-wider shadow-md">
                         Pay Arrears (හිඟ මුදල් ගෙවන්න)
                     </button>
                 </div>
-                <div class="mt-2 text-[9px] text-center text-red-400 font-bold italic">
-                    * හිඟ මුදල් පමණක් ගෙවීමට සභාපතිතුමාගේ අනුමැතිය අවශ්‍ය වේ.
+                <div class="mt-2 text-[9px] text-center text-red-500 font-bold italic">
+                    * හිඟ මුදල් පමණක් ගෙවා සාමාජිකත්වය රැක ගැනීමට සභාපතිතුමියගේ අනුමැතිය අවශ්‍ය වේ.
                 </div>
             </div>
         `;
-    } else if (dues.isNewMember) {
+    } else if (dues.isNewMember && dues.entranceDue > 0) {
         warningHtml = `
             <div class="mb-3 bg-blue-50 border border-blue-200 rounded-xl p-3">
                 <div class="flex items-center gap-3 text-blue-700">
@@ -942,6 +991,7 @@ window.handleTxMemberSelection = async (value) => {
                     <span>ඇතුලත්වීමේ ගාස්තු ලැබීම්:</span><span class="text-right font-semibold">Rs. ${dues.entranceDue.toFixed(2)}</span>
                     <span>මාසික ගාස්තු ලැබීම්:</span><span class="text-right font-semibold">Rs. ${dues.monthlyDue.toFixed(2)}</span>
                     <span>සුභ සාධක අරමුදල් ලැබීම් (${dues.funeralCount}):</span><span class="text-right font-semibold">Rs. ${dues.funeralDue.toFixed(2)}</span>
+                    ${dues.arrearsDue > 0 ? `<span>පැරණි හිඟ මුදල්:</span><span class="text-right font-semibold text-red-600">Rs. ${dues.arrearsDue.toFixed(2)}</span>` : ''}
                 </div>
             </div>
         `;
@@ -1065,6 +1115,20 @@ window.getMemberDues = async (memberId) => {
         funeralDue = Math.max(0, totalFuneralExpected - funeralPaid);
     }
 
+    // 4. Arrears Balance (Manual Entry + Recovery)
+    const arrearsAcc = accounts.find(a => a.accountName === 'හිඟ මුදල් ලැබීම්' || a.accountName.includes('Arrears Recovery'));
+    let arrearsPaid = 0;
+    if (arrearsAcc) {
+        const aEntries = await db.entries.where('accountId').equals(arrearsAcc.id).toArray();
+        for (let e of aEntries) {
+            const tx = await db.transactions.get(e.transactionId);
+            if (tx && tx.memberId === memberId && tx.status !== 'Cancelled' && tx.date >= joinDateStr) {
+                arrearsPaid += (parseFloat(e.credit) || 0);
+            }
+        }
+    }
+    const arrearsDue = Math.max(0, (member.openingArrears || 0) - arrearsPaid);
+
     // Membership Status Flags
     const isInvalid = monthsBehind >= 6;
     const sixMonthsAgo = new Date();
@@ -1075,6 +1139,7 @@ window.getMemberDues = async (memberId) => {
         entranceDue, 
         monthlyDue, 
         funeralDue, 
+        arrearsDue,
         funeralCount: validFuneralCount,
         isInvalid,
         isNewMember,
@@ -1107,6 +1172,10 @@ window.autoFillDues = async (memberId) => {
     }
     if (dues.funeralDue > 0 && funeralAcc) {
         window.addTxLineWithAmount(funeralAcc.id, dues.funeralDue);
+    }
+    const arrearsAcc = accounts.find(a => a.accountName === 'හිඟ මුදල් ලැබීම්' || a.accountName.includes('Arrears Recovery'));
+    if (dues.arrearsDue > 0 && arrearsAcc) {
+        window.addTxLineWithAmount(arrearsAcc.id, dues.arrearsDue);
     }
 
     window.calculateTxTotal();

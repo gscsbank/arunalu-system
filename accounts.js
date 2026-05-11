@@ -61,7 +61,7 @@ async function loadAccountsTable() {
 
     tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-gray-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading...</td></tr>`;
 
-    const accounts = await db.accounts.toArray();
+    const accounts = (await db.accounts.toArray()).filter(a => (a.unit || 'Main') === window.currentUnit);
     const entries = await db.entries.toArray();
 
     // Update summary counts
@@ -223,7 +223,8 @@ window.saveAccount = async (e, id) => {
         const payload = {
             accountName: document.getElementById('accName').value,
             accountType: document.getElementById('accType').value,
-            category: document.getElementById('accCat').value
+            category: document.getElementById('accCat').value,
+            unit: window.currentUnit
         };
         const opBal = parseFloat(document.getElementById('accOpeningBal').value) || 0;
 
@@ -255,6 +256,7 @@ window.saveAccount = async (e, id) => {
                     reference: 'OP-BAL',
                     description: `Opening Balance injection for ${payload.accountName}`,
                     amount: opBal,
+                    unit: window.currentUnit,
                     status: 'Completed'
                 });
 
@@ -290,10 +292,20 @@ window.editAccount = (id) => {
 };
 
 window.deleteAccount = async (id) => {
-    // Basic dependency check mapping table entries
-    const usedInEntries = await db.entries.where('accountId').equals(id).count();
-    if (usedInEntries > 0) {
-        window.utils.showToast('Cannot delete account as it has associated transactions.', 'error');
+    // Dependency check: Count entries that belong to ACTIVE transactions and have non-zero amounts
+    const entries = await db.entries.where('accountId').equals(id).toArray();
+    let activeEntriesCount = 0;
+    
+    for (let entry of entries) {
+        const tx = await db.transactions.get(entry.transactionId);
+        // If transaction is active and has non-zero amount, it's a real dependency
+        if (tx && tx.status !== 'Cancelled' && (entry.debit > 0 || entry.credit > 0)) {
+            activeEntriesCount++;
+        }
+    }
+
+    if (activeEntriesCount > 0) {
+        window.utils.showToast('Cannot delete account as it has active transactions or non-zero history.', 'error');
         return;
     }
 

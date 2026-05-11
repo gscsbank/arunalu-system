@@ -14,10 +14,10 @@ db.version(2).stores({
     transactions: '++id, date, type, reference, memberId, description'
 });
 
-db.version(5).stores({
-    members: '++id, memberNo, nic, name, phone, joinedDate',
-    accounts: '++id, accountName, accountType, category',
-    transactions: '++id, date, type, reference, memberId, userId, description',
+db.version(8).stores({
+    members: '++id, memberNo, nic, name, shopName, phone, joinedDate, unit',
+    accounts: '++id, accountName, accountType, category, unit',
+    transactions: '++id, date, type, reference, memberId, userId, unit, description',
     entries: '++id, transactionId, accountId, debit, credit',
     fixedAssets: '++id, assetName, purchaseDate, cost',
     budget: '++id, accountId, period, amount',
@@ -29,15 +29,15 @@ db.version(5).stores({
 // Utility to initialize default accounts if they don't exist
 async function initDefaultAccounts() {
     const requiredAccounts = [
-        { accountName: 'අරුණළු මුදල් පොත', accountType: 'Asset', category: 'Current Asset', oldName: 'Cash in Hand' },
-        { accountName: 'සණස බාහිර තැන්පතු ගිණුම', accountType: 'Asset', category: 'Current Asset', oldName: 'Bank Account' },
-        { accountName: 'ඇතුලත්වීමේ ගාස්තු ලැබීම්', accountType: 'Income', category: 'Revenue', oldName: 'Entrance Fee' },
+        { accountName: 'අරුණළු මුදල් පොත', accountType: 'Asset', category: 'Current Asset', unit: 'Main' },
+        { accountName: 'සණස බාහිර තැන්පතු ගිණුම', accountType: 'Asset', category: 'Current Asset', unit: 'Main' },
+        { accountName: 'SAP මුදල් පොත', accountType: 'Asset', category: 'Current Asset', unit: 'SAP' },
+        { accountName: 'සිතුමිණ තැන්පත් ගිණුම', accountType: 'Asset', category: 'Current Asset', unit: 'SAP' },
+        { accountName: 'ඇතුලත්වීමේ ගාස්තු ලැබීම්', accountType: 'Income', category: 'Revenue', unit: 'Main' },
         { accountName: 'දායක අරමුදල් ලැබීම්', accountType: 'Income', category: 'Revenue', oldName: 'Monthly Contribution (Rs. 100)' },
         { accountName: 'සාමාජික අරමුදල් ලැබීම්', accountType: 'Income', category: 'Revenue', oldName: 'Monthly Membership (Rs. 200)' },
         { accountName: 'සුභ සාධක අරමුදල් ලැබීම්', accountType: 'Income', category: 'Revenue', oldName: 'Funeral Contribution (Rs. 200)' },
-        { accountName: 'Monthly Subscription', accountType: 'Income', category: 'Revenue' },
-        { accountName: 'Meeting Expenses', accountType: 'Expense', category: 'Operating Expense' },
-        { accountName: 'Welfare Payments', accountType: 'Expense', category: 'Operating Expense' }
+        { accountName: 'හිඟ මුදල් ලැබීම්', accountType: 'Income', category: 'Revenue', unit: 'Main' }
     ];
 
     for (let acc of requiredAccounts) {
@@ -53,9 +53,25 @@ async function initDefaultAccounts() {
 
         const existing = await db.accounts.where('accountName').equalsIgnoreCase(acc.accountName).first();
         if (!existing) {
-            await db.accounts.add({ accountName: acc.accountName, accountType: acc.accountType, category: acc.category });
+            await db.accounts.add({ accountName: acc.accountName, accountType: acc.accountType, category: acc.category, unit: acc.unit || 'Main' });
+        } else if (!existing.unit) {
+            await db.accounts.update(existing.id, { unit: acc.unit || 'Main' });
         }
     }
+    
+    // Cleanup: Remove unwanted accounts if they exist and have no transactions
+    const unwanted = ['හිඟ මුදල් පියවීම්', 'Monthly Subscription', 'Meeting Expenses', 'Welfare Payments'];
+    for (const name of unwanted) {
+        const acc = await db.accounts.where('accountName').equalsIgnoreCase(name).first();
+        if (acc) {
+            const hasEntries = await db.entries.where('accountId').equals(acc.id).count();
+            if (hasEntries === 0) {
+                await db.accounts.delete(acc.id);
+                console.log(`Cleaned up unwanted account: ${name}`);
+            }
+        }
+    }
+
     console.log("Required accounts verified/initialized.");
     
     // Set specific opening balance for Sanasa External Deposit Account as requested

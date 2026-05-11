@@ -4,8 +4,8 @@ async function renderReports() {
         <div class="glass-panel p-6 rounded-2xl h-full flex flex-col no-print bg-white print:bg-white text-gray-800">
             <div class="flex justify-between items-center mb-6 no-print">
                 <div>
-                    <h3 class="text-xl font-bold text-gray-800">Reports Module</h3>
-                    <p class="text-sm text-gray-500">Generate and print accounting reports</p>
+                    <h3 class="text-xl font-bold text-gray-800">${window.currentUnit === 'SAP' ? 'SAP CENTER - ARUNALU WELFARE' : 'Reports Module'}</h3>
+                    <p class="text-sm text-gray-500">${window.currentUnit === 'SAP' ? 'Project financial statements and records' : 'Generate and print accounting reports'}</p>
                 </div>
                 <div class="flex gap-2">
                     <button onclick="window.triggerReportPrint()" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-lg shadow-brand-500/30">
@@ -18,14 +18,15 @@ async function renderReports() {
                 <select id="reportType" onchange="generateReport()" class="px-4 py-2 rounded-xl border border-gray-200 focus:border-brand-500 bg-white/50 w-64 outline-none">
                     <option value="trial_balance">ශේෂ පිරික්සුම (Trial Balance)</option>
                     <option value="pnl">ලැබීම් හා ගෙවීම් ප්‍රකාශනය (Receipts & Payments Statement)</option>
-                    <option value="balance_sheet">තත්ත්ව ප්‍රකාශය (Balance Sheet)</option>
+                    ${window.currentUnit === 'Main' ? '<option value="balance_sheet">තත්ත්ව ප්‍රකාශය (Balance Sheet)</option>' : ''}
                     <option value="gl_summary">ලෙජර් සාරාංශය (GL Summary)</option>
                     <option value="gl_transactions">ප්‍රධාන ලෙජරය (General Ledger)</option>
                     <option value="account_ledger">ගිණුම් ලෙජරය (Individual Account Ledger)</option>
                     <option value="fixed_assets">ස්ථාවර වත්කම් (Fixed Assets)</option>
                     <option value="bank_summary">බැංකු ගිණුම් සාරාංශය (Bank Summary)</option>
+                    <option value="receipt_book">රිසිට්පත් ලේඛනය (Receipt Book - Audit)</option>
                     <option value="member_list">සාමාජික ලැයිස්තුව (Member List)</option>
-                    <option value="funerals">මරණ වාර්තා ලේඛනය (Funerals Report)</option>
+                    ${window.currentUnit === 'Main' ? '<option value="funerals">මරණ වාර්තා ලේඛනය (Funerals Report)</option>' : ''}
                 </select>
                 
                 <div id="accountSelectorContainer" class="hidden animate-fade-in">
@@ -99,6 +100,7 @@ window.generateReport = async () => {
         'account_ledger': 'ගිණුම් ලෙජරය (Individual Account Ledger)',
         'fixed_assets': 'ස්ථාවර වත්කම් සාරාංශය (Fixed Assets)',
         'bank_summary': 'බැංකු ගිණුම් සාරාංශය (Bank Summary)',
+        'receipt_book': 'රිසිට්පත් ලේඛනය (Receipt Book Report)',
         'member_list': 'සාමාජික ලැයිස්තුව (Member List)',
         'funerals': 'මරණ වාර්තා ලේඛනය (Funerals Report)'
     };
@@ -117,13 +119,13 @@ window.generateReport = async () => {
 
 
     let dateSubtitle = "දිනය: " + date;
-    if (['pnl', 'receipt_payment', 'gl_transactions'].includes(type) && startDate) {
+    if (['pnl', 'receipt_payment', 'gl_transactions', 'receipt_book'].includes(type) && startDate) {
         dateSubtitle = "කාල සීමාව: " + startDate + " සිට " + date + " දක්වා";
     }
 
     const headerHtml = `
         <div class="mb-5 border-b-2 border-black pb-4 text-center">
-            <h1 class="text-base font-black uppercase tracking-[0.3em] text-gray-900 leading-none whitespace-nowrap">Arunalu Welfare Society</h1>
+            <h1 class="text-base font-black uppercase tracking-[0.3em] text-gray-900 leading-none whitespace-nowrap">${window.currentUnit === 'SAP' ? 'SAP CENTER - ARUNALU WELFARE' : 'Arunalu Welfare Society'}</h1>
             <p class="text-[8px] font-bold text-gray-500 uppercase tracking-[0.3em] mt-1">Galapitiyagama Sanasa Society</p>
             <div class="mt-3">
                 <h2 class="text-sm font-black uppercase tracking-tight text-gray-900">${titles[type] || 'Report'}</h2>
@@ -142,11 +144,28 @@ window.generateReport = async () => {
     const members = await db.members.toArray();
     const funerals = await db.funerals.toArray();
 
-    // Context up to End Date
+    // Context up to End Date - FILTERED BY UNIT
+    const sapCashAccounts = ['SAP මුදල් පොත', 'සිතුමිණ තැන්පත් ගිණුම'];
+    const sapCashAccountIds = new Set(accounts.filter(a => sapCashAccounts.some(name => a.accountName && a.accountName.trim() === name)).map(a => a.id));
+
     const allTxsEnd = await db.transactions.where('date').belowOrEqual(date).toArray();
-    const validTxsEnd = allTxsEnd.filter(t => t.status !== 'Cancelled');
+    
+    // For Balance Sheet/Bank Summary in Main unit, we need entries from both Main transactions 
+    // AND SAP transactions that involve the specific SAP Cash accounts.
+    const isMainUnit = window.currentUnit === 'Main';
+
+    // Standard unit filtering for transactions
+    const validTxsEnd = allTxsEnd.filter(t => {
+        if (t.status === 'Cancelled') return false;
+        const txUnit = t.unit || 'Main';
+        if (!isMainUnit) return txUnit === 'SAP';
+        return txUnit === 'Main';
+    });
+
     const validTxIdsEnd = new Set(validTxsEnd.map(t => t.id));
-    const entriesEnd = entries.filter(e => validTxIdsEnd.has(e.transactionId));
+    
+    // Core entries for the current unit - KEEP CLEAN FOR LEDGERS
+    let entriesEnd = entries.filter(e => validTxIdsEnd.has(e.transactionId));
 
     // Context Strictly Period Between
     let validTxsPeriod = validTxsEnd;
@@ -154,7 +173,9 @@ window.generateReport = async () => {
         validTxsPeriod = validTxsEnd.filter(t => t.date >= startDate);
     }
     const validTxIdsPeriod = new Set(validTxsPeriod.map(t => t.id));
-    const entriesPeriod = entries.filter(e => validTxIdsPeriod.has(e.transactionId));
+    
+    // Core entries for the period - KEEP CLEAN FOR LEDGERS
+    let entriesPeriod = entries.filter(e => validTxIdsPeriod.has(e.transactionId));
 
 
     if (type === 'trial_balance' || type === 'gl_summary') {
@@ -171,6 +192,20 @@ window.generateReport = async () => {
                 debit += parseFloat(e.debit) || 0;
                 credit += parseFloat(e.credit) || 0;
             });
+
+            // LOCAL ROLL-UP: Add SAP cash account entries if we are in Main unit and it's a summary report
+            if (isMainUnit && sapCashAccountIds.has(acc.id)) {
+                const isTrial = (type === 'trial_balance');
+                const extraEntries = entries.filter(e => {
+                    const tx = allTxsEnd.find(t => t.id === e.transactionId);
+                    const isInPeriod = isTrial || (tx && tx.date >= (startDate || '1970-01-01') && tx.date <= date);
+                    return tx && tx.status !== 'Cancelled' && tx.unit === 'SAP' && e.accountId === acc.id && isInPeriod;
+                });
+                extraEntries.forEach(e => {
+                    debit += parseFloat(e.debit) || 0;
+                    credit += parseFloat(e.credit) || 0;
+                });
+            }
 
             let balance = 0;
             let balType = 'DR';
@@ -241,13 +276,13 @@ window.generateReport = async () => {
                 const bal = credit - debit;
                 if (bal !== 0) {
                     totalIncome += bal;
-                    incHtml += '<tr><td class="py-1.5 pl-6 text-sm">' + acc.accountName + '</td><td class="py-1.5 text-right text-sm">' + formatCurrency(bal) + '</td></tr>';
+                    incHtml += '<tr><td class="py-1.5 pl-6 text-sm">' + acc.accountName + '</td><td class="py-1.5 text-right text-sm pr-4">' + formatCurrency(bal) + '</td></tr>';
                 }
             } else if (acc.accountType === 'Expense') {
                 const bal = debit - credit;
                 if (bal !== 0) {
                     totalExpense += bal;
-                    expHtml += '<tr><td class="py-1.5 pl-6 text-sm">' + acc.accountName + '</td><td class="py-1.5 text-right text-sm">' + formatCurrency(bal) + '</td></tr>';
+                    expHtml += '<tr><td class="py-1.5 pl-6 text-sm">' + acc.accountName + '</td><td class="py-1.5 text-right text-sm pr-4">' + formatCurrency(bal) + '</td></tr>';
                 }
             }
         }
@@ -262,10 +297,28 @@ window.generateReport = async () => {
         let closingCash = 0;
         accounts.filter(a => a.accountType === 'Asset').forEach(acc => {
             const eb = entriesBefore.filter(e => e.accountId === acc.id);
-            openingCash += eb.reduce((sum, e) => sum + (parseFloat(e.debit) || 0) - (parseFloat(e.credit) || 0), 0);
+            let oCash = eb.reduce((sum, e) => sum + (parseFloat(e.debit) || 0) - (parseFloat(e.credit) || 0), 0);
 
             const ee = entriesEnd.filter(e => e.accountId === acc.id);
-            closingCash += ee.reduce((sum, e) => sum + (parseFloat(e.debit) || 0) - (parseFloat(e.credit) || 0), 0);
+            let cCash = ee.reduce((sum, e) => sum + (parseFloat(e.debit) || 0) - (parseFloat(e.credit) || 0), 0);
+
+            // LOCAL ROLL-UP for P&L Cash Reconciliation
+            if (isMainUnit && sapCashAccountIds.has(acc.id)) {
+                const sapBefore = entries.filter(e => {
+                    const tx = allTxsEnd.find(t => t.id === e.transactionId);
+                    return tx && tx.status !== 'Cancelled' && tx.unit === 'SAP' && e.accountId === acc.id && tx.date < (startDate || '1970-01-01');
+                });
+                oCash += sapBefore.reduce((sum, e) => sum + (parseFloat(e.debit) || 0) - (parseFloat(e.credit) || 0), 0);
+
+                const sapAll = entries.filter(e => {
+                    const tx = allTxsEnd.find(t => t.id === e.transactionId);
+                    return tx && tx.status !== 'Cancelled' && tx.unit === 'SAP' && e.accountId === acc.id && tx.date <= date;
+                });
+                cCash += sapAll.reduce((sum, e) => sum + (parseFloat(e.debit) || 0) - (parseFloat(e.credit) || 0), 0);
+            }
+
+            openingCash += oCash;
+            closingCash += cCash;
         });
 
         contentHtml = `
@@ -355,6 +408,18 @@ window.generateReport = async () => {
                 debit += parseFloat(e.debit) || 0;
                 credit += parseFloat(e.credit) || 0;
             });
+
+            // LOCAL ROLL-UP for Balance Sheet (Main Society mode only)
+            if (isMainUnit && sapCashAccountIds.has(acc.id)) {
+                const extraSap = entries.filter(e => {
+                    const tx = allTxsEnd.find(t => t.id === e.transactionId);
+                    return tx && tx.status !== 'Cancelled' && tx.unit === 'SAP' && e.accountId === acc.id && tx.date <= date;
+                });
+                extraSap.forEach(e => {
+                    debit += parseFloat(e.debit) || 0;
+                    credit += parseFloat(e.credit) || 0;
+                });
+            }
 
             if (acc.accountType === 'Asset') {
                 const bal = debit - credit;
@@ -515,9 +580,9 @@ window.generateReport = async () => {
     } else if (type === 'gl_transactions') {
         let glHtml = '';
 
-        let txForPeriod = allTxsEnd;
+        let txForPeriod = validTxsEnd;
         if (startDate) {
-            txForPeriod = allTxsEnd.filter(t => t.date >= startDate);
+            txForPeriod = validTxsEnd.filter(t => t.date >= startDate);
         }
         const sortedTxs = [...txForPeriod].sort((a, b) => new Date(a.date) - new Date(b.date));
 
@@ -569,7 +634,7 @@ window.generateReport = async () => {
         for (let acc of accounts) {
             let isTypeMatch = false;
 
-            if (type === 'bank_summary' && (acc.category === 'Current Asset' && (acc.accountName && (acc.accountName.toLowerCase().includes('cash') || acc.accountName.toLowerCase().includes('bank') || acc.accountName.includes('මුදල් පොත') || acc.accountName.includes('තැන්පතු'))))) isTypeMatch = true;
+            if (type === 'bank_summary' && (acc.accountType === 'Asset' && (acc.accountName && (acc.accountName.toLowerCase().includes('cash') || acc.accountName.toLowerCase().includes('bank') || acc.accountName.includes('මුදල් පොත') || acc.accountName.includes('තැන්පතු') || acc.accountName.includes('ගිණුම'))))) isTypeMatch = true;
             if (type === 'fixed_assets' && acc.category === 'Fixed Asset') isTypeMatch = true;
 
             if (!isTypeMatch) continue;
@@ -578,6 +643,19 @@ window.generateReport = async () => {
             entriesEnd.filter(e => e.accountId === acc.id).forEach(e => {
                 debit += parseFloat(e.debit) || 0; credit += parseFloat(e.credit) || 0;
             });
+
+            // LOCAL ROLL-UP for Bank Summary
+            if (isMainUnit && sapCashAccountIds.has(acc.id)) {
+                const extraSap = entries.filter(e => {
+                    const tx = allTxsEnd.find(t => t.id === e.transactionId);
+                    return tx && tx.status !== 'Cancelled' && tx.unit === 'SAP' && e.accountId === acc.id && tx.date <= date;
+                });
+                extraSap.forEach(e => {
+                    debit += parseFloat(e.debit) || 0;
+                    credit += parseFloat(e.credit) || 0;
+                });
+            }
+
             let bal = debit - credit;
             if (bal !== 0) {
                 totalVal += bal;
@@ -598,6 +676,70 @@ window.generateReport = async () => {
                     <tr class="border-t-2 border-b-4 border-gray-800 font-bold bg-gray-100 text-lg">
                         <td class="py-4 pl-4">මුළු වටිනාකම (Total Value)</td>
                         <td class="py-4 text-right pr-4">${formatCurrency(totalVal)}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        `;
+    } else if (type === 'receipt_book') {
+        const receiptTxs = validTxsPeriod.filter(t => t.type === 'Receipt').sort((a, b) => {
+            // Sort by reference (AR000001...)
+            return (a.reference || '').localeCompare(b.reference || '', undefined, { numeric: true });
+        });
+
+        let rowsHtml = '';
+        let grandTotal = 0;
+
+        for (let tx of receiptTxs) {
+            const txEntries = entries.filter(e => e.transactionId === tx.id);
+            const credits = txEntries.filter(e => e.credit > 0);
+            const totalAmount = credits.reduce((sum, e) => sum + (parseFloat(e.credit) || 0), 0);
+            grandTotal += totalAmount;
+
+            let memberName = '-';
+            if (tx.memberId) {
+                const m = members.find(mem => mem.id === tx.memberId);
+                if (m) memberName = `${m.memberNo} - ${m.name}`;
+            } else if (tx.otherName) {
+                memberName = tx.otherName;
+            }
+
+            const breakdown = credits.map(e => {
+                const acc = accounts.find(a => a.id === e.accountId);
+                return `<div class="text-[9px] text-gray-600 flex justify-between">
+                    <span>${acc?.accountName || 'Unknown'}</span>
+                    <span class="font-bold">${formatCurrency(e.credit)}</span>
+                </div>`;
+            }).join('');
+
+            rowsHtml += `
+                <tr class="border-b border-gray-200 align-top">
+                    <td class="py-3 px-2 text-[10px] font-bold">${tx.date}</td>
+                    <td class="py-3 px-2 text-[11px] font-black text-brand-700">${tx.reference || '-'}</td>
+                    <td class="py-3 px-2 text-[10px] font-bold">${memberName}</td>
+                    <td class="py-3 px-2">${breakdown}</td>
+                    <td class="py-3 px-2 text-right font-black text-[11px]">${formatCurrency(totalAmount)}</td>
+                </tr>
+            `;
+        }
+
+        contentHtml = `
+            <table class="w-full text-left border-collapse border-t-4 border-black">
+                <thead class="bg-gray-50 border-b-2 border-black">
+                    <tr class="uppercase text-[10px] font-black tracking-widest text-gray-900">
+                        <th class="py-3 px-2 w-24">දිනය</th>
+                        <th class="py-3 px-2 w-24">අංකය (REF)</th>
+                        <th class="py-3 px-2 w-48">සාමාජිකයා / නම</th>
+                        <th class="py-3 px-2">විස්තරය (Breakdown)</th>
+                        <th class="py-3 px-2 text-right w-32">මුළු මුදල (Rs)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml || '<tr><td colspan="5" class="py-12 text-center text-gray-400 italic">මෙම කාල සීමාව තුළ ලැබීම් (Receipts) දත්ත නැත</td></tr>'}
+                </tbody>
+                <tfoot>
+                    <tr class="border-t-2 border-b-4 border-gray-900 font-black bg-gray-50">
+                        <td colspan="4" class="py-3 px-2 text-right uppercase text-xs">මුළු ලැබීම් එකතුව (Grand Total Receipts):</td>
+                        <td class="py-3 px-2 text-right text-sm underline decoration-double">${formatCurrency(grandTotal)}</td>
                     </tr>
                 </tfoot>
             </table>
@@ -744,7 +886,7 @@ window.generateReport = async () => {
         <div class="mt-20 flex justify-between items-center page-break-inside-avoid">
             <div class="text-center w-64">
                 <div class="text-gray-400 text-xs tracking-[0.5em] leading-none mb-1">...........................</div>
-                <div class="font-bold text-xs uppercase tracking-wider">Treasurer / භාණ්ඩාගාරික</div>
+                <div class="font-bold text-xs uppercase tracking-wider">${window.currentUnit === 'SAP' ? 'SAP CENTER MANAGER / SAP මධ්‍යස්ථාන කළමනාකරු' : 'Treasurer / භාණ්ඩාගාරික'}</div>
             </div>
             <div class="text-center w-64">
                 <div class="text-gray-400 text-xs tracking-[0.5em] leading-none mb-1">...........................</div>
@@ -752,7 +894,7 @@ window.generateReport = async () => {
             </div>
         </div>
         <div class="mt-12 text-center border-t border-black pt-4">
-            <p class="text-[11px] font-black uppercase tracking-[0.2em] text-gray-900 leading-none">Galapitiyagama Sanasa Welfare Division</p>
+            <p class="text-[11px] font-black uppercase tracking-[0.2em] text-gray-900 leading-none">${window.currentUnit === 'SAP' ? 'SAP CENTER - ARUNALU WELFARE PROJECT' : 'Galapitiyagama Sanasa Welfare Division'}</p>
             <p class="text-[8px] text-gray-400 font-bold uppercase tracking-wider mt-1.5 italic">Report Generated by Arunalu Welfare Society Accounting System - Developed by Iraasoft Solution</p>
         </div>
     `;
@@ -824,17 +966,37 @@ async function generateMonthlyBook() {
     const entries = await db.entries.toArray();
     const members = await db.members.toArray();
     const funerals = await db.funerals.toArray();
+    const sapCashAccounts = ['SAP මුදල් පොත', 'සිතුමිණ තැන්පත් ගිණුම'];
+    const sapCashAccountIds = new Set(accounts.filter(a => sapCashAccounts.includes(a.accountName)).map(a => a.id));
+    const isMainUnit = window.currentUnit === 'Main';
+
     const allTxs = await db.transactions.where('date').belowOrEqual(endDate).toArray();
-    const validTxsEnd = allTxs.filter(t => t.status !== 'Cancelled');
+    const validTxsEnd = allTxs.filter(t => {
+        if (t.status === 'Cancelled') return false;
+        const txUnit = t.unit || 'Main';
+        if (!isMainUnit) return txUnit === 'SAP';
+        return txUnit === 'Main';
+    });
+
     const validTxIdsEnd = new Set(validTxsEnd.map(t => t.id));
-    const entriesEnd = entries.filter(e => validTxIdsEnd.has(e.transactionId));
+    let entriesEnd = entries.filter(e => validTxIdsEnd.has(e.transactionId));
+    
+    // Roll-up specific SAP accounts into Main
+    if (isMainUnit) {
+        const extraSapEntries = entries.filter(e => {
+            const tx = allTxs.find(t => t.id === e.transactionId);
+            return tx && tx.status !== 'Cancelled' && tx.unit === 'SAP' && sapCashAccountIds.has(e.accountId);
+        });
+        entriesEnd = [...entriesEnd, ...extraSapEntries];
+    }
+
     const validTxsPeriod = validTxsEnd.filter(t => t.date >= startDate);
     const validTxIdsPeriod = new Set(validTxsPeriod.map(t => t.id));
     const entriesPeriod = entries.filter(e => validTxIdsPeriod.has(e.transactionId));
 
     const pageBreak = '<div style="page-break-after: always;"></div>';
     const sectionHeader = (title) => `<div class="mb-5 border-b-2 border-black pb-4 text-center">
-        <h1 class="text-base font-black uppercase tracking-[0.3em] text-gray-900 leading-none whitespace-nowrap">Arunalu Welfare Society</h1>
+        <h1 class="text-base font-black uppercase tracking-[0.3em] text-gray-900 leading-none whitespace-nowrap">${isMainUnit ? 'Arunalu Welfare Society' : 'SAP Center - Arunalu Welfare'}</h1>
         <p class="text-[8px] font-bold text-gray-500 uppercase tracking-[0.3em] mt-1">Galapitiyagama Sanasa Society</p>
         <div class="mt-3"><h2 class="text-sm font-black uppercase tracking-tight text-gray-900">${title}</h2>
         <div class="inline-block px-2 py-0.5 bg-black text-white text-[8px] font-bold uppercase tracking-widest mt-1">කාල සීමාව: ${startDate} සිට ${endDate} දක්වා</div></div></div>`;
@@ -842,8 +1004,8 @@ async function generateMonthlyBook() {
     // === COVER PAGE ===
     const coverPage = `<div style="display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:90vh;text-align:center;">
         <div style="border:3px solid black;padding:60px 80px;max-width:500px;">
-            <h1 style="font-size:28px;font-weight:900;text-transform:uppercase;letter-spacing:0.3em;margin:0;">Arunalu</h1>
-            <h1 style="font-size:28px;font-weight:900;text-transform:uppercase;letter-spacing:0.3em;margin:0;">Welfare Society</h1>
+            <h1 style="font-size:28px;font-weight:900;text-transform:uppercase;letter-spacing:0.3em;margin:0;">${isMainUnit ? 'Arunalu' : 'SAP CENTER'}</h1>
+            <h1 style="font-size:28px;font-weight:900;text-transform:uppercase;letter-spacing:0.3em;margin:0;">${isMainUnit ? 'Welfare Society' : 'ARUNALU WELFARE'}</h1>
             <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4em;color:#666;margin-top:8px;">Galapitiyagama Sanasa Society</p>
             <div style="width:60px;height:3px;background:black;margin:30px auto;"></div>
             <h2 style="font-size:20px;font-weight:900;text-transform:uppercase;letter-spacing:0.15em;">Monthly Financial Report</h2>
@@ -885,7 +1047,7 @@ async function generateMonthlyBook() {
 
     // === BANK SUMMARY ===
     let bkR='',bkT=0;
-    for(let acc of accounts){if(!(acc.category==='Current Asset'&&acc.accountName&&(acc.accountName.toLowerCase().includes('cash')||acc.accountName.toLowerCase().includes('bank'))))continue;let d=0,c=0;entriesEnd.filter(e=>e.accountId===acc.id).forEach(e=>{d+=parseFloat(e.debit)||0;c+=parseFloat(e.credit)||0;});let b=d-c;if(b!==0){bkT+=b;bkR+=`<tr><td class="py-2.5 pl-4">${acc.accountName}</td><td class="py-2.5 text-right font-medium pr-4">${formatCurrency(b)}</td></tr>`;}}
+    for(let acc of accounts){if(!(acc.accountType==='Asset'&&acc.accountName&&(acc.accountName.toLowerCase().includes('cash')||acc.accountName.toLowerCase().includes('bank')||acc.accountName.includes('මුදල් පොත')||acc.accountName.includes('තැන්පතු')||acc.accountName.includes('ගිණුම'))))continue;let d=0,c=0;entriesEnd.filter(e=>e.accountId===acc.id).forEach(e=>{d+=parseFloat(e.debit)||0;c+=parseFloat(e.credit)||0;});let b=d-c;if(b!==0){bkT+=b;bkR+=`<tr><td class="py-2.5 pl-4">${acc.accountName}</td><td class="py-2.5 text-right font-medium pr-4">${formatCurrency(b)}</td></tr>`;}}
     const bankPage = sectionHeader('බැංකු ගිණුම් සාරාංශය (Bank Summary)') + `<table class="w-full text-left border-collapse mb-8 border border-gray-200"><thead class="border-b-2 border-gray-800 bg-gray-50"><tr><th class="py-3 pl-4">ගිණුම් නාමය</th><th class="py-3 text-right pr-4">ශේෂය (Rs)</th></tr></thead><tbody>${bkR||'<tr><td colspan="2" class="py-8 text-center text-gray-400">දත්ත නැත</td></tr>'}</tbody><tfoot><tr class="border-t-2 border-b-4 border-gray-800 font-bold bg-gray-100 text-lg"><td class="py-4 pl-4">මුළු වටිනාකම</td><td class="py-4 text-right pr-4">${formatCurrency(bkT)}</td></tr></tfoot></table>`;
 
     // === GL SUMMARY ===
@@ -913,10 +1075,13 @@ async function generateMonthlyBook() {
         <div style="border:2px solid black;padding:40px 50px;max-width:550px;margin:0 auto;">
             <h2 style="font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;margin-bottom:5px;">Internal Audit Verification</h2>
             <h3 style="font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:25px;">අභ්‍යන්තර විගණන සහතිකය</h3>
-            <p style="font-size:10px;color:#666;margin-bottom:30px;line-height:1.8;">We hereby certify that we have examined the financial records of<br><strong>Arunalu Welfare Society - Galapitiyagama Sanasa Society</strong><br>for the month of <strong>${monthName} ${year}</strong> and found them to be accurate and in order.</p>
+            <p style="font-size:10px;color:#666;margin-bottom:30px;line-height:1.8;">
+                We hereby certify that we have examined the financial records of<br><strong>${isMainUnit ? 'Arunalu Welfare Society' : 'SAP Center Project - Arunalu Welfare'}</strong><br>for the month of <strong>${monthName} ${year}</strong> and found them to be accurate and in order.<br>
+                <span style="font-weight:700;display:block;margin-top:10px;">මෙයින් අප සහතික කරනු ලබන්නේ ${isMainUnit ? 'අරුණළු සුභසාධක සමිතිය' : 'අරුණළු සුභසාධක - SAP මධ්‍යස්ථාන ව්‍යාපෘතිය'} හි ${monthName} ${year} මාසය සඳහා වූ මූල්‍ය වාර්තා අප විසින් පරීක්ෂා කළ බවත්, ඒවා නිවැරදි සහ විධිමත් බවත්ය.</span>
+            </p>
             <div style="width:60px;height:2px;background:black;margin:25px auto;"></div>
             <div style="display:flex;justify-content:space-between;margin-top:50px;">
-                <div style="text-align:center;width:200px;"><div style="letter-spacing:0.3em;color:#aaa;font-size:10px;">...........................</div><div style="font-size:10px;font-weight:800;text-transform:uppercase;margin-top:5px;">Treasurer / භාණ්ඩාගාරික</div></div>
+                <div style="text-align:center;width:200px;"><div style="letter-spacing:0.3em;color:#aaa;font-size:10px;">...........................</div><div style="font-size:10px;font-weight:800;text-transform:uppercase;margin-top:5px;">${isMainUnit ? 'Treasurer / භාණ්ඩාගාරික' : 'SAP CENTER MANAGER / SAP මධ්‍යස්ථාන කළමනාකරු'}</div></div>
                 <div style="text-align:center;width:200px;"><div style="letter-spacing:0.3em;color:#aaa;font-size:10px;">...........................</div><div style="font-size:10px;font-weight:800;text-transform:uppercase;margin-top:5px;">Chairman / සභාපති</div></div>
             </div>
             <div style="display:flex;justify-content:space-between;margin-top:45px;">
@@ -927,12 +1092,12 @@ async function generateMonthlyBook() {
                 <p style="font-size:9px;color:#999;font-weight:700;">Date / දිනය: ................................</p>
             </div>
         </div>
-        <p style="font-size:7px;color:#aaa;margin-top:30px;font-weight:600;text-transform:uppercase;letter-spacing:0.3em;">Galapitiyagama Sanasa Welfare Division</p>
-        <p style="font-size:6px;color:#ccc;font-weight:600;text-transform:uppercase;letter-spacing:0.2em;margin-top:3px;">Report Generated by Arunalu Welfare Society Accounting System - Developed by Iraasoft Solution</p>
+        <p style="font-size:10px;color:#777;margin-top:30px;font-weight:600;text-transform:uppercase;letter-spacing:0.2em;">Galapitiyagama Sanasa ${isMainUnit ? 'Welfare Division' : 'SAP Center Project'}</p>
+        <p style="font-size:9px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;margin-top:3px;">Report Generated by Arunalu Welfare Society Accounting System - Developed by Iraasoft Solution</p>
     </div>`;
 
     // Combine all pages
-    printContainer.innerHTML = coverPage + pageBreak + trialBalancePage + pageBreak + pnlPage + pageBreak + bsPage + pageBreak + glSummaryPage + pageBreak + glPage + pageBreak + bankPage + pageBreak + fixedAssetsPage + pageBreak + auditPage;
+    printContainer.innerHTML = coverPage + pageBreak + trialBalancePage + pageBreak + pnlPage + (isMainUnit ? (pageBreak + bsPage) : '') + pageBreak + glSummaryPage + pageBreak + glPage + pageBreak + bankPage + pageBreak + fixedAssetsPage + pageBreak + auditPage;
 }
 
 // === STANDALONE MONTHLY BOOK VIEW ===

@@ -37,17 +37,32 @@ window.auth = {
         const container = document.getElementById('user-profile-nav');
         if (container && this.session) {
             container.innerHTML = `
-                <div class="flex items-center gap-3 px-3 py-4 border-t border-gray-800 mt-4">
-                    <div class="w-10 h-10 rounded-full bg-brand-500 flex items-center justify-center font-bold text-white shadow-lg">
-                        ${this.session.name.charAt(0).toUpperCase()}
+                <div class="mt-auto px-4 pb-6">
+                    <div class="bg-gray-50 border border-gray-100 p-4 rounded-3xl shadow-sm group transition-all hover:shadow-md hover:bg-white hover:border-brand-200">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center font-black text-white shadow-lg shadow-brand-500/20 text-lg transition-transform group-hover:scale-110">
+                                ${this.session.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div class="flex-1 overflow-hidden">
+                                <div class="font-black text-sm text-gray-900 tracking-tight truncate">${this.session.name}</div>
+                                <div class="text-[10px] text-brand-600 font-black uppercase tracking-[0.15em] mt-0.5">${this.session.role}</div>
+                            </div>
+                        </div>
+                        <div class="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                            <button onclick="window.backupModule.handleBackupFlow()" class="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 py-2.5 rounded-xl font-bold transition-all border border-emerald-100 flex items-center justify-center gap-2 text-[10px] uppercase tracking-wider shadow-sm">
+                                <i class="fa-solid fa-shield-halved"></i> Secure Backup
+                            </button>
+                            <div class="flex justify-between items-center">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest">System Active</span>
+                                </div>
+                                <button onclick="auth.logout()" class="w-8 h-8 rounded-xl bg-gray-200/50 text-gray-500 hover:bg-red-500 hover:text-white transition-all duration-300 flex items-center justify-center group/btn shadow-sm">
+                                    <i class="fa-solid fa-power-off text-xs transition-transform group-hover/btn:rotate-90"></i>
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                    <div class="flex-1 overflow-hidden">
-                        <div class="font-bold text-sm truncate">${this.session.name}</div>
-                        <div class="text-xs text-gray-500 truncate">${this.session.role}</div>
-                    </div>
-                    <button onclick="auth.logout()" class="text-gray-500 hover:text-red-400 p-2 transition-colors tooltip" title="Logout">
-                        <i class="fa-solid fa-power-off"></i>
-                    </button>
                 </div>
             `;
         }

@@ -4,8 +4,8 @@ async function renderMembers() {
         <div class="glass-panel p-6 rounded-2xl h-full flex flex-col">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div>
-                    <h3 class="text-xl font-bold text-gray-800">Member Management</h3>
-                    <p class="text-sm text-gray-500">Manage welfare society members</p>
+                    <h3 class="text-xl font-bold text-gray-800">${window.currentUnit === 'SAP' ? 'Shop / Tenant Management' : 'Member Management'}</h3>
+                    <p class="text-sm text-gray-500">${window.currentUnit === 'SAP' ? 'Manage shop rental tenants' : 'Manage welfare society members'}</p>
                 </div>
                 <button onclick="openMemberModal()" class="w-full md:w-auto bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-brand-500/30 text-sm">
                     <i class="fa-solid fa-plus"></i> Add New Member
@@ -23,8 +23,8 @@ async function renderMembers() {
                 <table class="w-full text-left border-collapse">
                     <thead class="bg-gray-50/80 sticky top-0 backdrop-blur-md z-10">
                         <tr>
-                            <th class="px-6 py-4 font-semibold text-gray-600 text-sm border-b border-gray-100">Member No</th>
-                            <th class="px-6 py-4 font-semibold text-gray-600 text-sm border-b border-gray-100">Name</th>
+                            <th class="px-6 py-4 font-semibold text-gray-600 text-sm border-b border-gray-100">${window.currentUnit === 'SAP' ? 'ID / No' : 'Member No'}</th>
+                            <th class="px-6 py-4 font-semibold text-gray-600 text-sm border-b border-gray-100">Name ${window.currentUnit === 'SAP' ? '/ Shop' : ''}</th>
                             <th class="px-6 py-4 font-semibold text-gray-600 text-sm border-b border-gray-100">NIC</th>
                             <th class="px-6 py-4 font-semibold text-gray-600 text-sm border-b border-gray-100">Phone</th>
                             <th class="px-6 py-4 font-semibold text-gray-600 text-sm border-b border-gray-100 text-right">Actions</th>
@@ -61,13 +61,16 @@ async function loadMembersTable(searchQuery = '') {
         let members = [];
         if (searchQuery) {
             members = await db.members.filter(m =>
+                ((m.unit || 'Main') === window.currentUnit) && (
                 (m.name && m.name.toLowerCase().includes(searchQuery)) ||
                 (m.nic && m.nic.toLowerCase().includes(searchQuery)) ||
+                (m.shopName && m.shopName.toLowerCase().includes(searchQuery)) ||
                 (m.memberNo && String(m.memberNo).toLowerCase().includes(searchQuery))
+                )
             ).toArray();
         } else {
             const allM = await db.members.toArray();
-            members = allM.filter(m => m && typeof m === 'object').reverse();
+            members = allM.filter(m => m && (m.unit || 'Main') === window.currentUnit).reverse();
         }
 
         if (members.length === 0) {
@@ -86,7 +89,10 @@ async function loadMembersTable(searchQuery = '') {
                         <div class="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-bold text-xs">
                             ${initial}
                         </div>
-                        ${rawName}
+                        <div>
+                            <div class="font-bold">${rawName}</div>
+                            ${m.shopName ? `<div class="text-[10px] text-brand-600 font-bold uppercase tracking-widest">${m.shopName}</div>` : ''}
+                        </div>
                     </div>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-600">${m.nic || '-'}</td>
@@ -174,11 +180,12 @@ window.viewMemberProfile = async (id) => {
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div class="bg-gray-50 rounded-xl p-4 md:p-5 border border-gray-100 shadow-sm md:col-span-2">
-                <h4 class="text-sm font-black text-brand-600 mb-4 uppercase tracking-widest border-b border-gray-200 pb-2">About Member</h4>
+                <h4 class="text-sm font-black text-brand-600 mb-4 uppercase tracking-widest border-b border-gray-200 pb-2">${member.unit === 'SAP' ? 'Tenant / Shop Info' : 'About Member'}</h4>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                    <p class="flex flex-col sm:flex-row sm:items-center"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">Member No:</span> <span class="font-bold text-gray-800">${member.memberNo || '-'}</span></p>
+                    <p class="flex flex-col sm:flex-row sm:items-center"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">${member.unit === 'SAP' ? 'ID / No:' : 'Member No:'}</span> <span class="font-bold text-gray-800">${member.memberNo || '-'}</span></p>
                     <p class="flex flex-col sm:flex-row sm:items-center"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">Joined Date:</span> <span class="font-bold text-gray-800">${member.joinedDate || '-'}</span></p>
                     <p class="flex flex-col sm:flex-row sm:items-center sm:col-span-2"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">Full Name:</span> <span class="font-bold text-gray-800">${rawName}</span></p>
+                    ${member.unit === 'SAP' ? `<p class="flex flex-col sm:flex-row sm:items-center sm:col-span-2"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">Shop Name:</span> <span class="font-bold text-brand-600">${member.shopName || '-'}</span></p>` : ''}
                     <p class="flex flex-col sm:flex-row sm:items-center"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">NIC:</span> <span class="font-bold text-gray-800">${member.nic || '-'}</span></p>
                     <p class="flex flex-col sm:flex-row sm:items-center"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">Phone:</span> <span class="font-bold text-gray-800">${member.phone || '-'}</span></p>
                     <p class="flex flex-col sm:flex-row sm:items-start sm:col-span-2"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">Address:</span> <span class="font-bold text-gray-800">${member.address || '-'}</span></p>
@@ -193,7 +200,7 @@ window.viewMemberProfile = async (id) => {
                         ${dues.isInvalid ? 'Invalid' : dues.isNewMember ? 'New Member' : 'Active'}
                      </span>
                  </div>
-                 <div class="space-y-3">
+                 <div class="space-y-3 ${member.unit === 'SAP' ? 'hidden' : ''}">
                     <div class="flex justify-between items-center text-xs">
                         <span class="text-brand-300">Entrance:</span>
                         <span class="font-bold">${dues.entranceDue.toFixed(2)}</span>
@@ -211,7 +218,12 @@ window.viewMemberProfile = async (id) => {
                         <span class="text-xl font-black text-white">Rs. ${totalDue.toFixed(2)}</span>
                     </div>
                  </div>
-                 ${dues.isInvalid ? `
+                 ${member.unit === 'SAP' ? `
+                    <div class="py-4 text-center">
+                        <p class="text-[10px] text-brand-300 uppercase tracking-widest mb-1 font-black">Monthly Rent Record</p>
+                        <p class="text-xs text-white opacity-80 italic">Payments are recorded via standard receipts.</p>
+                    </div>
+                 ` : (dues.isInvalid ? `
                     <div class="grid grid-cols-2 gap-2 mt-4">
                         <button onclick="window.renewMemberMembership(${member.id}); window.viewMemberProfile(${member.id});" class="bg-red-600 hover:bg-red-700 py-2 rounded-lg text-[10px] font-bold transition-all border border-red-500 shadow-lg">
                             Renew (13,000)
@@ -224,11 +236,11 @@ window.viewMemberProfile = async (id) => {
                     <button onclick="window.utils.closeModal(); openTransactionModal('Receipt'); setTimeout(() => { document.getElementById('txPayerInput').value = '${member.memberNo} - ${rawName}'; window.handleTxMemberSelection('${member.memberNo} - ${rawName}'); }, 300)" class="w-full mt-4 bg-white/10 hover:bg-white/20 py-2 rounded-lg text-xs font-bold transition-all border border-white/10">
                         Collect Payment Now
                     </button>
-                 ` : '')}
+                 ` : ''))}
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 ${member.unit === 'SAP' ? 'hidden' : ''}">
             <div class="bg-gray-50 rounded-xl p-5 border border-gray-100 shadow-sm">
                  <h4 class="text-sm font-semibold text-brand-600 mb-3 uppercase tracking-wide border-b border-gray-200 pb-2">Family & Nominees</h4>
                  <div class="space-y-2.5 text-sm">
@@ -311,10 +323,11 @@ window.addNomineeRow = (nominee = { name: '', relation: '', address: '', dob: ''
 
 window.openMemberModal = async (id = null) => {
     let member = {
-        memberNo: '', name: '', nic: '', phone: '', joinedDate: new Date().toISOString().split('T')[0],
+        memberNo: '', name: '', shopName: '', nic: '', phone: '', joinedDate: new Date().toISOString().split('T')[0],
         dob: '', address: '', maritalStatus: 'Married',
         benName: '', benAddress: '', benPhone: '',
         openingEntrancePaid: 0, openingPaidUntil: '',
+        unit: window.currentUnit,
         nominees: [] // array replacing single flat attributes
     };
     let isEdit = false;
@@ -338,31 +351,40 @@ window.openMemberModal = async (id = null) => {
         }
     }
 
+    const isSAP = window.currentUnit === 'SAP';
     const html = `
-        <h3 class="text-xl font-bold text-gray-800 mb-6">${isEdit ? 'Edit Member' : 'Add New Member'}</h3>
+        <h3 class="text-xl font-bold text-gray-800 mb-6">${isEdit ? 'Edit Info' : isSAP ? 'Add New Shop Tenant' : 'Add New Member'}</h3>
         <form id="memberForm" class="space-y-6 max-h-[70vh] overflow-y-auto px-1 custom-scrollbar" onsubmit="window.saveMember(event, ${id})">
             
             <!-- Basic Information -->
             <div>
-                <h4 class="text-sm font-black text-brand-600 mb-4 border-b pb-2 uppercase tracking-widest">Basic Details</h4>
+                <h4 class="text-sm font-black text-brand-600 mb-4 border-b pb-2 uppercase tracking-widest">${isSAP ? 'Tenant & Shop Details' : 'Basic Details'}</h4>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">Member Number <span class="text-red-500">*</span></label>
-                        <input type="text" id="mNo" required value="${member.memberNo}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
+                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">${isSAP ? 'Tenant ID / No' : 'Member Number'}</label>
+                        <input type="text" id="mNo" value="${member.memberNo}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
                     </div>
                     <div>
-                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">Joined Date <span class="text-red-500">*</span></label>
-                        <input type="date" id="mJoined" required value="${member.joinedDate}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
+                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">Registration Date</label>
+                        <input type="date" id="mJoined" value="${member.joinedDate}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
                     </div>
                 </div>
-                <div class="mb-4">
-                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">Full Name <span class="text-red-500">*</span></label>
-                    <input type="text" id="mName" required value="${member.name}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div class="${isSAP ? '' : 'md:col-span-2'}">
+                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">Full Name</label>
+                        <input type="text" id="mName" value="${member.name}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
+                    </div>
+                    ${isSAP ? `
+                    <div>
+                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">Shop Name</label>
+                        <input type="text" id="mShop" value="${member.shopName || ''}" class="w-full px-4 py-2.5 rounded-xl border border-brand-500 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all font-bold text-brand-600">
+                    </div>
+                    ` : ''}
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">NIC <span class="text-red-500">*</span></label>
-                        <input type="text" id="mNic" required value="${member.nic}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
+                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">NIC</label>
+                        <input type="text" id="mNic" value="${member.nic}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
                     </div>
                     <div>
                         <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">Date of Birth</label>
@@ -389,7 +411,7 @@ window.openMemberModal = async (id = null) => {
             </div>
 
             <!-- Death Beneficiary Details -->
-            <div>
+            <div class="${isSAP ? 'hidden' : ''}">
                 <h4 class="text-lg font-semibold text-brand-600 mb-3 border-b pb-2">Death Beneficiary (<span class="text-sm font-normal">මිය ගිය විට ප්‍රතිලාභ ලබන්නා</span>)</h4>
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Beneficiary Full Name</label>
@@ -408,11 +430,11 @@ window.openMemberModal = async (id = null) => {
             </div>
 
             <!-- Opening Balances / Initial State -->
-            <div>
+            <div class="${isSAP ? 'hidden' : ''}">
                 <h4 class="text-sm font-black text-amber-600 mb-4 border-b pb-2 flex items-center gap-2 uppercase tracking-widest">
                     <i class="fa-solid fa-clock-rotate-left"></i> Opening Balances
                 </h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">Entrance Paid (Rs.)</label>
                         <input type="number" id="mOpeningEntrance" value="${member.openingEntrancePaid || 0}" step="0.01" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all placeholder-gray-400">
@@ -421,11 +443,15 @@ window.openMemberModal = async (id = null) => {
                         <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">Paid Until</label>
                         <input type="month" id="mOpeningPaidUntil" value="${member.openingPaidUntil || ''}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all">
                     </div>
+                    <div>
+                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter text-red-600">Arrears Balance (Rs.)</label>
+                        <input type="number" id="mOpeningArrears" value="${member.openingArrears || 0}" step="0.01" class="w-full px-4 py-2.5 rounded-xl border border-red-200 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 outline-none transition-all font-bold text-red-700 bg-red-50/30">
+                    </div>
                 </div>
             </div>
 
             <!-- Nominee Details -->
-            <div>
+            <div class="${isSAP ? 'hidden' : ''}">
                 <div class="flex justify-between items-center mb-3 border-b pb-2">
                     <h4 class="text-lg font-semibold text-brand-600">General Nominees (<span class="text-sm font-normal">ප්‍රතිලාභ සඳහා නම් කරන අය</span>)</h4>
                     <button type="button" onclick="window.addNomineeRow()" class="text-xs text-brand-600 font-medium hover:text-brand-700 bg-brand-50 hover:bg-brand-100 flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors border border-brand-100">
@@ -493,9 +519,12 @@ window.saveMember = async (e, id) => {
             benName: document.getElementById('mBenName').value,
             benAddress: document.getElementById('mBenAddress').value,
             benPhone: document.getElementById('mBenPhone').value,
-            openingEntrancePaid: parseFloat(document.getElementById('mOpeningEntrance').value) || 0,
-            openingPaidUntil: document.getElementById('mOpeningPaidUntil').value,
-            nominees: nomineesList
+            openingEntrancePaid: parseFloat(document.getElementById('mOpeningEntrance')?.value) || 0,
+            openingPaidUntil: document.getElementById('mOpeningPaidUntil')?.value || '',
+            openingArrears: parseFloat(document.getElementById('mOpeningArrears')?.value) || 0,
+            nominees: nomineesList,
+            unit: window.currentUnit,
+            shopName: document.getElementById('mShop')?.value || ''
         };
 
         if (id) {

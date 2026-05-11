@@ -134,6 +134,12 @@
                         <i class="fa-solid fa-bars text-lg"></i>
                     </button>
 
+                    <!-- Unit Switcher -->
+                    <div class="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl no-print border border-gray-200 ml-2">
+                        <button onclick="window.setAccountingUnit('Main')" id="unit-main-btn" class="px-3 py-1.5 rounded-lg text-[10px] font-black tracking-tighter transition-all duration-300 bg-white shadow-sm text-blue-600 ring-1 ring-blue-500/10">MAIN SOCIETY</button>
+                        <button onclick="window.setAccountingUnit('SAP')" id="unit-sap-btn" class="px-3 py-1.5 rounded-lg text-[10px] font-black tracking-tighter transition-all duration-300 text-gray-500 hover:bg-gray-200 hover:text-gray-700">SAP CENTER</button>
+                    </div>
+
                     <!-- Search Bar -->
                     <div class="hidden md:flex items-center flex-1 max-w-md">
                         <div class="relative w-full">
@@ -185,6 +191,7 @@
     <script src="reports.js"></script>
     <script src="settings.js"></script>
     <script src="auth.js"></script>
+    <script src="backup.js"></script>
     <script src="app.js"></script>
 </body>
 
