@@ -706,7 +706,11 @@ window.printTransaction = async (id) => {
     requestAnimationFrame(() => {
         setTimeout(() => {
             window.print();
-        }, 150);
+            // Cleanup after print dialog closes
+            setTimeout(() => {
+                printArea.innerHTML = '';
+            }, 500);
+        }, 200);
     });
 };
 

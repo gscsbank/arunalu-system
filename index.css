@@ -143,20 +143,41 @@ h4 {
 
 /* Print */
 @media print {
-    body {
+    @page {
+        size: 55mm auto;
+        margin: 0;
+    }
+
+    html, body {
+        width: 55mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        height: auto !important;
         background: white;
-        color: black;
     }
 
     #sidebar,
     header,
-    .no-print {
+    .no-print,
+    #modal-container,
+    .glass-panel {
         display: none !important;
     }
 
-    #app-content {
-        padding: 0 !important;
+    #printArea {
+        display: block !important;
+        width: 55mm !important;
         margin: 0 !important;
+        padding: 0 !important;
+        position: absolute;
+        top: 0;
+        left: 0;
+    }
+
+    #app-content, 
+    main {
+        display: none !important;
     }
 }
 
