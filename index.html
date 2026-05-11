@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arunalu Accounting System</title>
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        header: ['Outfit', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="index.css">
+</head>
+
+<body class="bg-gray-50 text-gray-800 font-sans antialiased">
+    <!-- Web App Root Wrapper to prevent Extention Injection Conflicts -->
+    <div class="h-screen flex overflow-hidden w-full relative print:hidden">
+        <!-- Sidebar / Top Navigation wrapper -->
+        <aside id="sidebar"
+            class="w-64 bg-white text-gray-700 flex flex-col hidden md:flex transition-all duration-300 relative z-20 border-r border-gray-200">
+            <div class="p-6 pb-0 flex flex-col items-center text-center gap-0">
+                <img src="logo.png" alt="Arunalu Logo" class="w-44 h-auto object-contain drop-shadow-xl hover:scale-105 transition-transform duration-500 -mb-12">
+                <div class="relative z-10 space-y-0.5 mt-[-5px]">
+                    <h1 class="font-black text-xl leading-none tracking-tighter text-gray-900 uppercase">Arunalu</h1>
+                    <p class="text-[10px] text-gray-400 font-bold leading-tight uppercase tracking-[0.2em]">Accounting System</p>
+                    <div class="pt-1">
+                        <p class="text-[10px] text-gray-500 font-bold leading-tight uppercase tracking-widest">Galapitiyagama, Nikaweratiya</p>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="flex-1 overflow-y-auto py-2 custom-scrollbar">
+                <ul class="space-y-1">
+                    <li>
+                        <a href="#" data-view="dashboard" class="nav-link active-nav">
+                            <i class="fa-solid fa-chart-pie text-blue-600"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" data-view="members" class="nav-link">
+                            <i class="fa-solid fa-users text-emerald-500"></i>
+                            <span>Members</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" data-view="accounts" class="nav-link">
+                            <i class="fa-solid fa-book text-amber-500"></i>
+                            <span>Chart of Accounts</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" data-view="transactions" class="nav-link">
+                            <i class="fa-solid fa-money-bill-transfer text-violet-500"></i>
+                            <span>Transactions</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" data-view="reports" class="nav-link">
+                            <i class="fa-solid fa-file-invoice text-rose-500"></i>
+                            <span>Reports</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" data-view="monthly_book" class="nav-link">
+                            <i class="fa-solid fa-book text-indigo-500"></i>
+                            <span>Monthly Book</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" data-view="settings" class="nav-link">
+                            <i class="fa-solid fa-gears text-slate-500"></i>
+                            <span>Settings</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+
+            <div id="user-profile-nav" class="border-t border-gray-100 p-2">
+                <!-- Populated by auth.js -->
+            </div>
+
+            <div class="px-6 py-3 border-t border-gray-100">
+                <p class="text-[10px] text-gray-400 font-bold leading-tight text-center uppercase tracking-tighter">Galapitiyagama Sanasa Society <br> Welfare Branch</p>
+            </div>
+
+            <div class="p-4 border-t border-gray-100">
+                <div class="text-[10px] text-center text-gray-400 font-medium uppercase tracking-wider">
+                    Developed by <br><span class="text-gray-600 font-bold">Iraasoft Solution</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col h-screen overflow-hidden relative bg-gray-50">
+            <!-- Header -->
+            <header
+                class="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 z-30 sticky top-0">
+                <div class="flex items-center gap-4 flex-1">
+                    <button id="mobile-menu-btn" class="md:hidden text-gray-500">
+                        <i class="fa-solid fa-bars text-lg"></i>
+                    </button>
+
+                    <!-- Search Bar -->
+                    <div class="hidden md:flex items-center flex-1 max-w-md">
+                        <div class="relative w-full">
+                            <i
+                                class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                            <input type="text" id="global-search" placeholder="Search system..."
+                                class="w-full bg-gray-50 border border-gray-200 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 py-1.5 pl-9 pr-4 rounded text-sm transition-all outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <h2 id="page-title"
+                        class="text-sm font-bold text-gray-900 uppercase tracking-tighter hidden md:block">Dashboard
+                    </h2>
+                    <div class="h-6 w-[1px] bg-gray-200 hidden md:block"></div>
+                    <div
+                        class="text-[11px] font-bold text-gray-400 hidden sm:block uppercase tracking-widest whitespace-nowrap">
+                        <span id="current-date"></span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- View Container -->
+            <div id="app-content" class="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar relative">
+                <!-- Dynamic content will be loaded here -->
+            </div>
+        </main>
+
+        <!-- Modal Container -->
+        <div id="modal-container"
+            class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+            <!-- Modals injected here -->
+        </div>
+    </div>
+
+    <!-- Print Area -->
+    <div id="printArea" class="hidden print:block absolute inset-0 z-[100] bg-white text-black print:p-0 p-8"></div>
+
+    <!-- Dexie.js (CDN) -->
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
+
+    <!-- App Scripts -->
+    <script src="db.js"></script>
+    <script src="utils.js"></script>
+    <script src="members.js"></script>
+    <script src="accounts.js"></script>
+    <script src="transactions.js"></script>
+    <script src="reports.js"></script>
+    <script src="settings.js"></script>
+    <script src="auth.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>

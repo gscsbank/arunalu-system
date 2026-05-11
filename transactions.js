@@ -1,0 +1,1124 @@
+// Transactions Module Logic
+async function renderTransactions() {
+    return `
+        <div class="glass-panel p-6 rounded-2xl h-full flex flex-col">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h3 class="text-xl font-bold text-gray-800">Transactions Ledger</h3>
+                    <p class="text-sm text-gray-500">Record receipts, payments, and view journal entries</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="openTransactionModal('Receipt')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-lg shadow-green-500/30">
+                        <i class="fa-solid fa-arrow-down"></i> Receipt
+                    </button>
+                    <button onclick="openTransactionModal('Payment')" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-lg shadow-red-500/30">
+                        <i class="fa-solid fa-arrow-up"></i> Payment
+                    </button>
+                    <button onclick="openTransferModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-lg shadow-blue-500/30 ml-2 border border-blue-500">
+                        <i class="fa-solid fa-exchange-alt"></i> Transfer
+                    </button>
+                    <button onclick="window.openFuneralModal()" class="bg-gray-800 hover:bg-black text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-lg shadow-gray-500/30 ml-2">
+                        <i class="fa-solid fa-cross"></i> Deaths/Funerals
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Quick Filters -->
+            <div class="mb-6 flex gap-3">
+                <input type="date" id="txStartDate" class="px-4 py-2 rounded-xl border border-gray-200 focus:border-brand-500 bg-white/50">
+                <input type="date" id="txEndDate" class="px-4 py-2 rounded-xl border border-gray-200 focus:border-brand-500 bg-white/50">
+                <button onclick="loadTransactionsTable()" class="bg-brand-50 text-brand-600 px-4 py-2 rounded-xl border border-brand-100 hover:bg-brand-100 font-medium">Filter</button>
+            </div>
+
+            <!-- Table -->
+            <div class="flex-1 overflow-auto rounded-xl border border-gray-100 bg-white/50 custom-scrollbar">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-gray-50/80 sticky top-0 backdrop-blur-md z-10">
+                        <tr>
+                            <th class="px-6 py-4 font-semibold text-gray-600 text-sm border-b border-gray-100">Date</th>
+                            <th class="px-6 py-4 font-semibold text-gray-600 text-sm border-b border-gray-100">Type</th>
+                            <th class="px-6 py-4 font-semibold text-gray-600 text-sm border-b border-gray-100">Member</th>
+                            <th class="px-6 py-4 font-semibold text-gray-600 text-sm border-b border-gray-100">Reference</th>
+                            <th class="px-6 py-4 font-semibold text-gray-600 text-sm border-b border-gray-100">Description</th>
+                            <th class="px-6 py-4 font-semibold text-gray-600 text-sm border-b border-gray-100 text-right">Amount</th>
+                            <th class="px-6 py-4 font-semibold text-gray-600 text-sm border-b border-gray-100 text-center">User</th>
+                            <th class="px-6 py-4 font-semibold text-gray-600 text-sm border-b border-gray-100 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionsTableBody" class="divide-y divide-gray-100">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+function mountTransactions() {
+    loadTransactionsTable();
+}
+
+async function loadTransactionsTable() {
+    const tbody = document.getElementById('transactionsTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-gray-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading...</td></tr>`;
+
+    const startDate = document.getElementById('txStartDate')?.value;
+    const endDate = document.getElementById('txEndDate')?.value;
+
+    let query = db.transactions;
+    if (startDate && endDate) {
+        query = query.where('date').between(startDate, endDate, true, true);
+    }
+
+    const transactions = (await query.toArray()).reverse();
+
+    if (transactions.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-gray-400">No transactions found.</td></tr>`;
+        return;
+    }
+
+    // Pre-fetch all members for fast lookup
+    const membersMap = {};
+    const members = await db.members.toArray();
+    members.forEach(m => membersMap[m.id] = m);
+
+    // Pre-fetch all users for fast lookup
+    const usersMap = {};
+    const users = await db.users.toArray();
+    users.forEach(u => usersMap[u.id] = u);
+
+    let rows = [];
+    for (let tx of transactions) {
+        const entryDebits = await db.entries.where('transactionId').equals(tx.id).toArray();
+        const totalAmount = entryDebits.reduce((acc, curr) => acc + (parseFloat(curr.debit) || 0), 0);
+
+        let memberLabel = '-';
+        if (tx.memberId && membersMap[tx.memberId]) {
+            memberLabel = `<span class="px-2 py-1 rounded bg-blue-50 text-blue-700 text-xs font-semibold cursor-pointer hover:bg-blue-100" onclick="if(window.viewMemberProfile) window.viewMemberProfile(${tx.memberId})">${membersMap[tx.memberId].memberNo || ''} ${membersMap[tx.memberId].name}</span>`;
+        } else if (tx.otherName) {
+            memberLabel = `<span class="px-2 py-1 rounded bg-gray-100 text-gray-700 text-xs font-semibold">${tx.otherName} (Other)</span>`;
+        }
+
+        let statusStyle = tx.status === 'Cancelled' ? 'opacity-50 bg-red-50/20' : 'hover:bg-brand-50/50';
+        let txDesc = tx.description || '-';
+        if (tx.status === 'Cancelled') {
+            txDesc = `<span class="text-red-500 font-medium">[CANCELLED]</span> ${tx.cancelReason ? `<span>- ${tx.cancelReason}</span>` : ''}`;
+        }
+
+        let amountDisplay = tx.status === 'Cancelled' ? '<span class="line-through text-gray-400">' + totalAmount.toFixed(2) + '</span>' : totalAmount.toFixed(2);
+
+        rows.push(`
+            <tr class="transition-colors ${statusStyle}">
+                <td class="px-6 py-4 text-sm text-gray-600">${tx.date}</td>
+                <td class="px-6 py-4 text-sm">
+                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold ${tx.type === 'Receipt' ? 'bg-green-100 text-green-700' : tx.type === 'Payment' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}">
+                        ${tx.type}
+                    </span>
+                </td>
+                <td class="px-6 py-4 text-sm">${memberLabel}</td>
+                <td class="px-6 py-4 text-sm font-medium text-gray-800">${tx.reference || '-'}</td>
+                <td class="px-6 py-4 text-sm text-gray-600">${txDesc}</td>
+                <td class="px-6 py-4 text-sm font-bold text-gray-800 text-right">${amountDisplay}</td>
+                <td class="px-6 py-4 text-center">
+                    <div class="flex flex-col items-center">
+                        <span class="text-[10px] text-gray-400 uppercase font-bold">${usersMap[tx.userId]?.name || 'Admin'}</span>
+                    </div>
+                </td>
+                <td class="px-6 py-4 text-center">
+                    <div class="flex items-center justify-center gap-2">
+                        <button onclick="window.viewTransaction(${tx.id})" class="text-blue-600 hover:text-blue-800 w-8 h-8 rounded-lg bg-blue-50 hover:bg-blue-100 flex items-center justify-center transition-colors tooltip" title="View">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                        <button onclick="window.printTransaction(${tx.id})" class="text-brand-600 hover:brand-800 w-8 h-8 rounded-lg bg-brand-50 hover:bg-brand-100 flex items-center justify-center transition-colors tooltip" title="Print Bill">
+                            <i class="fa-solid fa-print"></i>
+                        </button>
+                        ${tx.status !== 'Cancelled' ? `
+                        <button onclick="window.cancelTransaction(${tx.id})" class="text-red-500 hover:text-red-700 w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 flex items-center justify-center transition-colors tooltip" title="Cancel">
+                            <i class="fa-solid fa-ban"></i>
+                        </button>` : ''}
+                    </div>
+                </td>
+            </tr>
+        `);
+    }
+
+    tbody.innerHTML = rows.join('');
+}
+
+// Ensure options reference is globally accessible for dynamic injection
+window.txGlobalAccountOptions = '';
+
+window.addTxLineRow = (preSelectedAccountId = null) => {
+    const container = document.getElementById('txLinesContainer');
+    if (!container) return;
+
+    const row = document.createElement('div');
+    row.className = "flex items-center gap-3 mb-3 bg-gray-50/50 p-3 rounded-xl border border-gray-200 relative pr-12 animate-fade-in";
+    row.innerHTML = `
+        <div class="flex-1">
+            <select name="lineAccountId[]" required class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all bg-white text-sm">
+                <option value="" disabled selected>Select Account</option>
+                ${window.txGlobalAccountOptions}
+            </select>
+        </div>
+        <div class="w-1/3">
+            <input type="number" name="lineAmount[]" required step="0.01" min="0.01" placeholder="0.00" oninput="window.calculateTxTotal()" class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all text-sm text-right">
+        </div>
+        <button type="button" onclick="this.parentElement.remove(); window.calculateTxTotal();" class="absolute right-2 text-red-400 hover:text-red-600 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 transition-colors tooltip" title="Remove Line">
+            <i class="fa-solid fa-trash"></i>
+        </button>
+    `;
+    container.appendChild(row);
+
+    if (preSelectedAccountId) {
+        const select = row.querySelector('select');
+        if (select) select.value = preSelectedAccountId;
+    }
+};
+
+window.calculateTxTotal = () => {
+    const amounts = Array.from(document.getElementsByName('lineAmount[]')).map(e => parseFloat(e.value) || 0);
+    const total = amounts.reduce((a, b) => a + b, 0);
+    const totalEl = document.getElementById('txTotalDisplay');
+    if (totalEl) totalEl.textContent = total.toFixed(2);
+};
+
+window.openTransactionModal = async (type) => {
+    // type is 'Receipt' or 'Payment'
+    const accounts = await db.accounts.toArray();
+    const members = await db.members.toArray();
+
+    const cashBankAccounts = accounts.filter(a =>
+        (a.accountName && (a.accountName.toLowerCase().includes('cash') || a.accountName.toLowerCase().includes('bank') || a.accountName.includes('මුදල් පොත') || a.accountName.includes('තැන්පතු'))) ||
+        a.category === 'Current Asset' ||
+        a.accountType === 'Asset'
+    );
+    const cbOptions = cashBankAccounts.map(a => `<option value="${a.id}">${a.accountName}</option>`).join('');
+
+    window.txGlobalAccountOptions = accounts.map(a => `<option value="${a.id}">${a.accountName} (${a.accountType})</option>`).join('');
+
+    const memOptions = members.map(m => `<option value="${m.memberNo} - ${m.name}"></option>`).join('');
+
+    const title = type === 'Receipt' ? 'New Receipt (Money In)' : 'New Payment (Money Out)';
+    const btnColor = type === 'Receipt' ? 'green' : 'red';
+    const splitTitle = type === 'Receipt' ? 'Received From (Accounts)' : 'Paid For (Accounts)';
+
+    const html = `
+        <h3 class="text-xl font-bold text-gray-800 mb-6">${title}</h3>
+        <form id="txForm" class="space-y-5 max-h-[75vh] overflow-y-auto px-1 custom-scrollbar" onsubmit="window.saveTransaction(event, '${type}')">
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Date <span class="text-red-500">*</span></label>
+                    <input type="date" id="txDate" required value="${new Date().toISOString().split('T')[0]}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Reference No</label>
+                    <input type="text" id="txRef" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all placeholder-gray-400" placeholder="e.g. REC-001">
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <input list="membersList" id="txPayerInput" onchange="window.handleTxMemberSelection(this.value)" oninput="window.handleTxMemberSelection(this.value)" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all bg-white" placeholder="Search member, or type any name..." autocomplete="off">
+                    <datalist id="membersList">
+                        ${memOptions}
+                    </datalist>
+                    <div id="duesSummaryContainer" class="mt-2 hidden animate-fade-in"></div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">${type === 'Receipt' ? 'Deposit To' : 'Pay From'} (Asset) <span class="text-red-500">*</span></label>
+                    <select id="cbAccount" required class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all bg-white">
+                        <option value="" disabled selected>Select Account</option>
+                        ${cbOptions}
+                    </select>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-100 pt-4">
+                <div class="flex justify-between items-center mb-3">
+                    <label class="block text-sm font-semibold text-gray-800">${splitTitle} <span class="text-red-500">*</span></label>
+                    <button type="button" onclick="window.addTxLineRow()" class="text-xs text-brand-600 font-medium hover:text-brand-700 bg-brand-50 hover:bg-brand-100 flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors border border-brand-100">
+                        <i class="fa-solid fa-plus"></i> Add Line
+                    </button>
+                </div>
+                
+                <div id="txLinesContainer">
+                    <!-- Dynamic splits go here -->
+                </div>
+                
+                <div class="flex justify-end pr-14 mt-2">
+                    <div class="text-gray-600 font-medium mr-4">Total Amount:</div>
+                    <div class="text-xl font-bold text-gray-800">Rs. <span id="txTotalDisplay">0.00</span></div>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Description / Narration <span class="text-gray-400 font-normal ml-1">(Optional)</span></label>
+                <textarea id="txDesc" rows="2" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all resize-none" placeholder="Provide transaction details..."></textarea>
+            </div>
+            
+            <div class="pt-4 border-t border-gray-100 flex justify-end gap-3 sticky bottom-0 bg-white/90 backdrop-blur-md pb-2 mt-4">
+                <button type="button" onclick="window.utils.closeModal()" class="px-5 py-2.5 rounded-lg text-gray-600 font-medium hover:bg-gray-100 transition-colors">Cancel</button>
+                <button type="button" onclick="window.saveTransaction(event, '${type}', true)" class="bg-gray-800 hover:bg-black text-white px-6 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-gray-500/30">
+                    <i class="fa-solid fa-print mr-2"></i> Save & Print
+                </button>
+                <button type="submit" class="bg-${btnColor}-600 hover:bg-${btnColor}-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-${btnColor}-500/30">
+                    <i class="fa-solid fa-save mr-2"></i> Save Only
+                </button>
+            </div>
+        </form>
+    `;
+
+    window.utils.showModal(html);
+
+    // Inject at least one line immediately
+    requestAnimationFrame(() => {
+        if (type === 'Receipt') {
+            const welfarAcc = accounts.find(a => a.accountName && a.accountName.includes('සුභ සාධක අරමුදල්'));
+            const memberAcc = accounts.find(a => a.accountName && a.accountName.includes('සාමාජික අරමුදල්'));
+            const contributionAcc = accounts.find(a => a.accountName && a.accountName.includes('දායක අරමුදල්'));
+
+            if (welfarAcc || memberAcc || contributionAcc) {
+                if (welfarAcc) window.addTxLineRow(welfarAcc.id);
+                if (memberAcc) window.addTxLineRow(memberAcc.id);
+                if (contributionAcc) window.addTxLineRow(contributionAcc.id);
+            } else {
+                window.addTxLineRow();
+            }
+        } else {
+            window.addTxLineRow();
+        }
+    });
+};
+
+window.saveTransaction = async (e, type, printAfter = false) => {
+    e.preventDefault();
+
+    try {
+        const date = document.getElementById('txDate').value;
+        const ref = document.getElementById('txRef').value;
+        const payerInput = document.getElementById('txPayerInput').value.trim();
+        const cbAccId = parseInt(document.getElementById('cbAccount').value);
+        const desc = document.getElementById('txDesc').value;
+
+        let memberId = null;
+        let otherName = null;
+
+        if (payerInput) {
+            const members = await db.members.toArray();
+            const matchedMember = members.find(m => `${m.memberNo} - ${m.name}` === payerInput || m.memberNo === payerInput || m.name === payerInput);
+            if (matchedMember) {
+                memberId = matchedMember.id;
+            } else {
+                otherName = payerInput;
+            }
+        }
+
+        // Process dynamic line items
+        const lineAccountIds = Array.from(document.getElementsByName('lineAccountId[]')).map(el => parseInt(el.value));
+        const lineAmounts = Array.from(document.getElementsByName('lineAmount[]')).map(el => parseFloat(el.value));
+
+        let validLines = [];
+        let totalAmount = 0;
+
+        for (let i = 0; i < lineAccountIds.length; i++) {
+            if (!isNaN(lineAccountIds[i]) && !isNaN(lineAmounts[i]) && lineAmounts[i] > 0) {
+                validLines.push({ accountId: lineAccountIds[i], amount: lineAmounts[i] });
+                totalAmount += lineAmounts[i];
+            }
+        }
+
+        if (!cbAccId || validLines.length === 0 || totalAmount <= 0) {
+            window.utils.showToast('Please verify your accounts and enter valid amounts greater than 0', 'error');
+            return;
+        }
+
+        // Add Transaction record
+        const txId = await db.transactions.add({
+            date: date,
+            type: type,
+            reference: ref,
+            memberId: memberId,
+            otherName: otherName,
+            description: desc,
+            userId: window.auth.session ? window.auth.session.id : null,
+            status: 'Active'
+        });
+
+        const entries = [];
+
+        if (type === 'Receipt') {
+            // Debit the Cash/Bank Asset for the TOTAL amount
+            entries.push({ transactionId: txId, accountId: cbAccId, debit: totalAmount, credit: 0 });
+            // Credit the individual Income/Liability accounts
+            validLines.forEach(line => {
+                entries.push({ transactionId: txId, accountId: line.accountId, debit: 0, credit: line.amount });
+            });
+        } else {
+            // Credit the Cash/Bank Asset for the TOTAL amount
+            entries.push({ transactionId: txId, accountId: cbAccId, debit: 0, credit: totalAmount });
+            // Debit the individual Expense/Asset accounts
+            validLines.forEach(line => {
+                entries.push({ transactionId: txId, accountId: line.accountId, debit: line.amount, credit: 0 });
+            });
+        }
+
+        await db.entries.bulkAdd(entries);
+
+        window.utils.showToast(`${type} saved successfully!`);
+        window.utils.closeModal();
+        loadTransactionsTable();
+        if (window.refreshCurrentView) window.refreshCurrentView();
+
+        if (printAfter) {
+            setTimeout(() => {
+                window.printTransaction(txId);
+            }, 500);
+        }
+    } catch (err) {
+        console.error(err);
+        window.utils.showToast('Error saving transaction', 'error');
+    }
+};
+
+window.openTransferModal = async () => {
+    const accounts = await db.accounts.toArray();
+    const cashBankAccounts = accounts.filter(a => (a.accountName && (a.accountName.toLowerCase().includes('cash') || a.accountName.toLowerCase().includes('bank') || a.accountName.includes('මුදල් පොත') || a.accountName.includes('තැන්පතු'))) || a.category === 'Current Asset');
+
+    let cbOptions = '<option value="" disabled selected>Select Account</option>';
+    cbOptions += cashBankAccounts.map(a => `<option value="${a.id}">${a.accountName}</option>`).join('');
+
+    const html = `
+        <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+            <i class="fa-solid fa-exchange-alt text-blue-600"></i> Inter-Account Transfer
+        </h3>
+        <form id="txTransferForm" class="space-y-5" onsubmit="window.saveTransfer(event)">
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Date <span class="text-red-500">*</span></label>
+                    <input type="date" id="tDate" required value="${new Date().toISOString().split('T')[0]}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Reference No</label>
+                    <input type="text" id="tRef" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all placeholder-gray-400" placeholder="e.g. TRF-001">
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4 bg-gray-50 border border-gray-100 p-4 rounded-xl relative">
+                <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-sm z-10 text-brand-600">
+                    <i class="fa-solid fa-arrow-right"></i>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Transfer From (Deduct) <span class="text-red-500">*</span></label>
+                    <select id="tFrom" required class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all bg-white relative z-0">
+                        ${cbOptions}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Transfer To (Add) <span class="text-red-500">*</span></label>
+                    <select id="tTo" required class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all bg-white pl-6">
+                        ${cbOptions}
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Transfer Amount (Rs.) <span class="text-red-500">*</span></label>
+                <input type="number" id="tAmount" required step="0.01" min="0.01" placeholder="0.00" class="w-full text-lg px-4 py-3 rounded-xl border border-green-300 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 outline-none transition-all bg-green-50/30 text-right font-bold text-gray-800">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Description / Narration</label>
+                <textarea id="tDesc" rows="2" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all resize-none" placeholder="e.g. Moved excess cash to bank..."></textarea>
+            </div>
+            
+            <div class="pt-4 border-t border-gray-100 flex justify-end gap-3 pb-2 mt-4">
+                <button type="button" onclick="window.utils.closeModal()" class="px-5 py-2.5 rounded-lg text-gray-600 font-medium hover:bg-gray-100 transition-colors border border-gray-200">Cancel</button>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-blue-500/30">
+                    <i class="fa-solid fa-paper-plane mr-2"></i> Submit Transfer
+                </button>
+            </div>
+        </form>
+    `;
+
+    window.utils.showModal(html);
+};
+
+window.saveTransfer = async (e) => {
+    e.preventDefault();
+    try {
+        const fromAccId = parseInt(document.getElementById('tFrom').value);
+        const toAccId = parseInt(document.getElementById('tTo').value);
+        const amount = parseFloat(document.getElementById('tAmount').value);
+
+        if (fromAccId === toAccId) {
+            window.utils.showToast("Cannot transfer to the same account", "error");
+            return;
+        }
+
+        const date = document.getElementById('tDate').value;
+        const ref = document.getElementById('tRef').value;
+        const desc = document.getElementById('tDesc').value;
+
+        const txId = await db.transactions.add({
+            date: date,
+            type: 'Transfer',
+            reference: ref,
+            memberId: null,
+            otherName: null,
+            description: desc || 'Inter-Account Transfer'
+        });
+
+        await db.entries.bulkAdd([
+            { transactionId: txId, accountId: toAccId, debit: amount, credit: 0 },
+            { transactionId: txId, accountId: fromAccId, debit: 0, credit: amount }
+        ]);
+
+        window.utils.showToast("Transfer completed securely");
+        window.utils.closeModal();
+        loadTransactionsTable();
+        if (window.refreshCurrentView) window.refreshCurrentView();
+    } catch (err) {
+        console.error(err);
+        window.utils.showToast("Error processing transfer", "error");
+    }
+};
+
+window.printTransaction = async (id) => {
+    const tx = await db.transactions.get(id);
+    if (!tx) return;
+
+    const entries = await db.entries.where('transactionId').equals(id).toArray();
+    let total = 0;
+    let linesHtml = '';
+
+    const accounts = await db.accounts.toArray();
+    const accMap = {};
+    accounts.forEach(a => accMap[a.id] = a);
+
+    if (tx.type === 'Receipt') {
+        const creditEntries = entries.filter(e => e.credit > 0);
+        total = creditEntries.reduce((a, e) => a + e.credit, 0);
+        linesHtml = creditEntries.map(e => `
+            <tr>
+                <td class="pt-1 pb-1 text-left align-top leading-tight" style="padding-right: 4px;">${accMap[e.accountId]?.accountName || 'Unknown'}</td>
+                <td class="pt-1 pb-1 text-right align-top leading-tight whitespace-nowrap">${e.credit.toFixed(2)}</td>
+            </tr>
+        `).join('');
+    } else if (tx.type === 'Transfer') {
+        const debitEntry = entries.find(e => e.debit > 0);
+        const creditEntry = entries.find(e => e.credit > 0);
+        total = debitEntry?.debit || 0;
+        linesHtml = `
+            <tr>
+                <td class="pt-1 pb-1 text-left align-top leading-tight" style="padding-right: 4px;">Transfer To: ${accMap[debitEntry?.accountId]?.accountName || 'Unknown'}</td>
+                <td class="pt-1 pb-1 text-right align-top leading-tight whitespace-nowrap">${total.toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td class="pt-1 pb-1 text-left align-top leading-tight text-gray-500" style="padding-right: 4px;">(From: ${accMap[creditEntry?.accountId]?.accountName || 'Unknown'})</td>
+                <td class="pt-1 pb-1 text-right align-top leading-tight whitespace-nowrap"></td>
+            </tr>
+        `;
+    } else {
+        const debitEntries = entries.filter(e => e.debit > 0);
+        total = debitEntries.reduce((a, e) => a + e.debit, 0);
+        linesHtml = debitEntries.map(e => `
+            <tr>
+                <td class="pt-1 pb-1 text-left align-top leading-tight" style="padding-right: 4px;">${accMap[e.accountId]?.accountName || 'Unknown'}</td>
+                <td class="pt-1 pb-1 text-right align-top leading-tight whitespace-nowrap">${e.debit.toFixed(2)}</td>
+            </tr>
+        `).join('');
+    }
+
+    let memberLabel = tx.otherName || '-';
+    if (tx.memberId) {
+        const member = await db.members.get(tx.memberId);
+        if (member) memberLabel = `${member.memberNo || ''} - ${member.name}`;
+    }
+
+    const printArea = document.getElementById('printArea');
+    const title = tx.type === 'Receipt' ? 'RECEIPT' : tx.type === 'Payment' ? 'PAYMENT VOUCHER' : 'TRANSFER VOUCHER';
+
+    let arrearsHtml = '';
+    if (tx.memberId && tx.type === 'Receipt') {
+        const dues = await window.getMemberDues(tx.memberId);
+        const totalArrears = dues.entranceDue + dues.monthlyDue + dues.funeralDue;
+        if (totalArrears > 0) {
+            arrearsHtml = `
+                <div style="border: 1px solid black; padding: 4px; margin-top: 8px; text-align: center; border-style: double;">
+                    <div style="font-size: 9px; font-weight: 800; text-transform: uppercase;">පසුගිය හිඟ ශේෂය (Total Arrears)</div>
+                    <div style="font-size: 11px; font-weight: 900;">Rs. ${totalArrears.toFixed(2)}</div>
+                </div>
+            `;
+        }
+    }
+
+    if (tx.type === 'Payment') {
+        // A5 Formal Layout for Payments - Doubled for A4 (Original + Office Copy)
+        const voucherHtml = (label) => `
+            <div style="width: 210mm; height: 148.5mm; padding: 15mm; font-family: 'Inter', sans-serif; color: black; background: white; border-bottom: 1px dashed #ccc; box-sizing: border-box; position: relative; overflow: hidden;">
+                <div style="position: absolute; right: 15mm; top: 15mm; font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; border: 1px solid #e2e8f0; padding: 1mm 3mm; border-radius: 4px;">${label}</div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid black; padding-bottom: 10mm; margin-bottom: 8mm;">
+                    <div>
+                        <h1 style="font-size: 24px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: -1px;">Arunalu Welfare Society</h1>
+                        <p style="font-size: 12px; color: #444; margin: 2px 0;">Galapitiyagama, Nikaweratiya</p>
+                        <p style="font-size: 10px; font-weight: bold; text-transform: uppercase; color: #666;">Galapitiyagama Sanasa Society - Welfare Branch</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <h2 style="font-size: 20px; font-weight: 800; margin: 0;">${title}</h2>
+                        <p style="font-size: 14px; font-weight: bold; margin-top: 4px;">Ref: ${tx.reference || '-'}</p>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8mm; font-size: 14px;">
+                    <div>
+                        <span style="color: #666; text-transform: uppercase; font-size: 10px; font-weight: 800; display: block; margin-bottom: 2px;">Paid To:</span>
+                        <span style="font-size: 18px; font-weight: 800;">${memberLabel}</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="color: #666; text-transform: uppercase; font-size: 10px; font-weight: 800; display: block; margin-bottom: 2px;">Date:</span>
+                        <span style="font-size: 16px; font-weight: 700;">${tx.date}</span>
+                    </div>
+                </div>
+
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 10mm;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid black;">
+                            <th style="text-align: left; padding: 3mm 0; font-size: 12px; text-transform: uppercase; font-weight: 800;">Description of Payment</th>
+                            <th style="text-align: right; padding: 3mm 0; font-size: 12px; text-transform: uppercase; font-weight: 800; width: 40mm;">Amount (Rs.)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${linesHtml}
+                        <tr style="border-top: 2px solid black;">
+                            <td style="text-align: right; padding: 4mm 0; font-weight: 800; font-size: 14px;">TOTAL AMOUNT PAID</td>
+                            <td style="text-align: right; padding: 4mm 0; font-weight: 900; font-size: 18px;">${total.toFixed(2)}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div style="display: flex; justify-content: space-between; margin-top: auto; padding-top: 5mm;">
+                    <div style="text-align: center; width: 30%;">
+                        <div style="border-top: 1.5px solid black; padding-top: 2mm;">
+                            <div style="font-size: 11px; font-weight: 800;">Member / Payee</div>
+                            <div style="font-size: 9px; color: #666;">සාමාජිකයාගේ අත්සන</div>
+                        </div>
+                    </div>
+                    <div style="text-align: center; width: 30%;">
+                        <div style="border-top: 1.5px solid black; padding-top: 2mm;">
+                            <div style="font-size: 11px; font-weight: 800;">Treasurer</div>
+                            <div style="font-size: 9px; color: #666;">භාණ්ඩාගාරික</div>
+                        </div>
+                    </div>
+                    <div style="text-align: center; width: 30%;">
+                        <div style="border-top: 1.5px solid black; padding-top: 2mm;">
+                            <div style="font-size: 11px; font-weight: 800;">Chairman</div>
+                            <div style="font-size: 9px; color: #666;">සභාපති</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        printArea.innerHTML = `
+            <div style="width: 210mm; background: white;">
+                ${voucherHtml('Original Copy - Member')}
+                ${voucherHtml('Office Copy - Society')}
+            </div>
+        `;
+    } else {
+        // Standard Thermal Layout for Receipts/Transfers
+        printArea.innerHTML = `
+            <div style="width: 58mm; max-width: 58mm; margin: 0 auto; padding: 2mm 2mm; font-family: 'Inter', 'Iskoola Pota', 'Nirmala UI', sans-serif; font-size: 11px; line-height: 1.3; color: black; background: white;">
+                
+                <div style="text-align: center; margin-bottom: 8px;">
+                    <h1 style="font-size: 14px; font-weight: bold; margin: 0; line-height: 1.2; text-transform: uppercase;">Arunalu Welfare Society</h1>
+                    <div style="font-size: 9px; font-weight: bold;">Galapitiyagama, Nikaweratiya</div>
+                    <div style="font-size: 8px; font-weight: bold; color: #444; margin-bottom: 4px; text-transform: uppercase;">Galapitiyagama Sanasa Society <br> Welfare Branch</div>
+                    <div style="margin-top: 4px; font-weight: bold; text-decoration: underline; font-size: 13px;">${title}</div>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                    <span>Date:</span>
+                    <span style="font-weight: bold;">${tx.date}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                    <span>Ref:</span>
+                    <span style="font-weight: bold;">${tx.reference || '-'}</span>
+                </div>
+
+                <div style="border-top: 1px dashed black; border-bottom: 1px dashed black; padding: 4px 0; margin-bottom: 6px;">
+                    <div style="margin-bottom: 2px;">${tx.type === 'Receipt' ? 'From:' : 'To:'}</div>
+                    <div style="font-weight: bold; font-size: 12px; line-height: 1.2;">${memberLabel}</div>
+                </div>
+
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 11px;">
+                    <tbody>
+                        ${linesHtml}
+                    </tbody>
+                </table>
+
+                <div style="border-top: 1px dashed black; padding: 4px 0; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: bold; font-size: 13px;">TOTAL:</span>
+                    <span style="font-weight: bold; font-size: 14px;">Rs. ${total.toFixed(2)}</span>
+                </div>
+
+                ${tx.description ? `
+                <div style="margin-bottom: 12px; font-size: 10px;">
+                    <span style="border-bottom: 1px solid black; display: inline-block; margin-bottom: 2px;">Memo:</span><br>
+                    <span style="line-height: 1.2;">${tx.description}</span>
+                </div>` : ''}
+
+                <div style="margin-top: 25px; text-align: center; display: flex; justify-content: space-between;">
+                    <div style="border-top: 1px solid black; width: 45%; font-size: 9px; padding-top: 2px;">Member</div>
+                    <div style="border-top: 1px solid black; width: 45%; font-size: 9px; padding-top: 2px;">භාණ්ඩාගාරික (Treasurer)</div>
+                </div>
+
+                ${arrearsHtml}
+
+                <div style="text-align: center; margin-top: 15px; font-size: 9px;">
+                    Thank You!
+                </div>
+            </div>
+        `;
+    }
+
+    // Wait a brief moment to ensure DOM is updated
+    requestAnimationFrame(() => {
+        setTimeout(() => {
+            window.print();
+        }, 150);
+    });
+};
+
+window.viewTransaction = async (id) => {
+    const tx = await db.transactions.get(id);
+    if (!tx) return;
+
+    const entries = await db.entries.where('transactionId').equals(id).toArray();
+    const accounts = await db.accounts.toArray();
+    const accMap = {};
+    accounts.forEach(a => accMap[a.id] = a);
+
+    let linesHtml = entries.map(e => `
+        <tr class="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+            <td class="py-2.5 px-4 text-sm text-gray-700">${accMap[e.accountId]?.accountName || 'Unknown Accounts'}</td>
+            <td class="py-2.5 px-4 text-right text-sm font-medium ${e.debit > 0 ? 'text-green-600' : 'text-gray-400'}">${e.debit > 0 ? e.debit.toFixed(2) : '-'}</td>
+            <td class="py-2.5 px-4 text-right text-sm font-medium ${e.credit > 0 ? 'text-red-600' : 'text-gray-400'}">${e.credit > 0 ? e.credit.toFixed(2) : '-'}</td>
+        </tr>
+    `).join('');
+
+    let memberLabel = tx.otherName || '-';
+    if (tx.memberId) {
+        const member = await db.members.get(tx.memberId);
+        if (member) memberLabel = `${member.memberNo || ''} - ${member.name}`;
+    }
+
+    let arrearsSummary = '';
+    if (tx.memberId) {
+        const dues = await window.getMemberDues(tx.memberId);
+        const totalArrears = dues.entranceDue + dues.monthlyDue + dues.funeralDue;
+        if (totalArrears > 0) {
+            arrearsSummary = `
+                <div class="col-span-2 bg-amber-50 border border-amber-200 rounded-xl p-4 flex justify-between items-center mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-lg">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                        </div>
+                        <div>
+                            <span class="block text-amber-800 font-bold text-sm">Current Outstanding Arrears</span>
+                            <span class="text-amber-600 text-xs">Remaining balance as of today.</span>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xl font-black text-amber-900">Rs. ${totalArrears.toFixed(2)}</span>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    const html = `
+        <div class="mb-6 flex justify-between items-start">
+            <div>
+                <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <i class="fa-solid fa-file-lines text-brand-600"></i> Transaction Details
+                </h3>
+                <p class="text-sm text-gray-500 mt-1">Reference: ${tx.reference || 'N/A'}</p>
+            </div>
+            ${tx.status === 'Cancelled' ? '<span class="bg-red-100 text-red-700 font-bold px-3 py-1 rounded-lg text-sm border border-red-200">CANCELLED</span>' : '<span class="bg-green-100 text-green-700 font-bold px-3 py-1 rounded-lg text-sm border border-green-200">ACTIVE</span>'}
+        </div>
+
+        ${arrearsSummary}
+
+        <div class="grid grid-cols-2 gap-4 mb-6 text-sm">
+            <div class="bg-gray-50 border border-gray-100 rounded-xl p-4">
+                <span class="block text-gray-500 mb-1">Date Logged</span>
+                <span class="font-semibold text-gray-800">${tx.date}</span>
+            </div>
+            <div class="bg-gray-50 border border-gray-100 rounded-xl p-4">
+                <span class="block text-gray-500 mb-1">Transaction Type</span>
+                <span class="font-semibold text-gray-800">${tx.type}</span>
+            </div>
+            <div class="bg-gray-50 border border-gray-100 rounded-xl p-4 col-span-2">
+                <span class="block text-gray-500 mb-1">Associated Member / Entity</span>
+                <span class="font-semibold text-gray-800">${memberLabel}</span>
+            </div>
+            <div class="bg-gray-50 border border-gray-100 rounded-xl p-4 col-span-2">
+                <span class="block text-gray-500 mb-1">Description</span>
+                <span class="font-medium text-gray-800">${tx.description || '-'}</span>
+            </div>
+            ${tx.status === 'Cancelled' ? `
+            <div class="bg-red-50 border border-red-100 rounded-xl p-4 col-span-2">
+                <span class="block text-red-500 mb-1 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Cancellation Reason</span>
+                <span class="font-bold text-red-700">${tx.cancelReason || 'No reason provided.'}</span>
+            </div>
+            ` : ''}
+        </div>
+
+        <div class="border border-gray-200 rounded-xl overflow-hidden mb-6">
+            <table class="w-full text-left">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="py-2.5 px-4 font-semibold text-xs text-gray-600 uppercase tracking-wider">Account</th>
+                        <th class="py-2.5 px-4 font-semibold text-xs text-gray-600 uppercase tracking-wider text-right">Debit (In)</th>
+                        <th class="py-2.5 px-4 font-semibold text-xs text-gray-600 uppercase tracking-wider text-right">Credit (Out)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${linesHtml}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="flex justify-end pr-1">
+            <button onclick="window.utils.closeModal()" class="bg-gray-800 hover:bg-black text-white px-6 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-gray-500/30">
+                Close Viewer
+            </button>
+        </div>
+    `;
+    window.utils.showModal(html);
+};
+
+window.cancelTransaction = async (id) => {
+    const html = `
+        <div class="text-center mb-6">
+            <div class="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4 text-2xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="text-xl font-bold text-gray-800">Cancel Transaction</h3>
+            <p class="text-sm text-gray-500 mt-1">This action cannot be undone. All related financial impact will be fully voided while keeping an audit trail.</p>
+        </div>
+        <form onsubmit="window.submitCancellation(event, ${id})">
+            <div class="mb-5 bg-red-50 border border-red-100 rounded-xl p-4">
+                <label class="block text-sm font-semibold text-red-700 mb-2">Reason for Cancellation <span class="text-red-500">*</span></label>
+                <textarea id="cancelReason" required rows="3" class="w-full px-4 py-3 rounded-lg border border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-500/30 outline-none transition-all resize-none shadow-sm" placeholder="To prevent fraud, you must state exactly why this transaction is being reversed..."></textarea>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button type="button" onclick="window.utils.closeModal()" class="px-5 py-2.5 rounded-lg text-gray-600 font-medium hover:bg-gray-100 transition-colors border border-gray-200">Keep Document</button>
+                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-red-500/30 flex items-center">
+                    <i class="fa-solid fa-ban mr-2"></i> Confirm Cancel
+                </button>
+            </div>
+        </form>
+    `;
+    window.utils.showModal(html);
+};
+
+window.submitCancellation = async (e, id) => {
+    e.preventDefault();
+    const reason = document.getElementById('cancelReason').value.trim();
+    if (!reason || reason.length < 5) {
+        window.utils.showToast("Please provide a more descriptive reason.", "error");
+        return;
+    }
+
+    try {
+        await db.transactions.update(id, {
+            status: 'Cancelled',
+            cancelReason: reason
+        });
+
+        // Find entries and zero them out to keep the audit trail fully intact
+        const entries = await db.entries.where('transactionId').equals(id).toArray();
+        for (let entry of entries) {
+            await db.entries.update(entry.id, { debit: 0, credit: 0 });
+        }
+
+        window.utils.showToast("Transaction safely cancelled & audited.", "success");
+        window.utils.closeModal();
+        loadTransactionsTable();
+        if (window.refreshCurrentView) window.refreshCurrentView();
+    } catch (err) {
+        console.error(err);
+        window.utils.showToast("Error cancelling transaction.", "error");
+    }
+};
+window.handleTxMemberSelection = async (value) => {
+    const container = document.getElementById('duesSummaryContainer');
+    if (!container) return;
+
+    const members = await db.members.toArray();
+    const matched = members.find(m => `${m.memberNo} - ${m.name}` === value || String(m.memberNo) === String(value) || m.name === value);
+
+    if (!matched) {
+        container.classList.add('hidden');
+        return;
+    }
+
+    const dues = await window.getMemberDues(matched.id);
+    const totalDue = dues.entranceDue + dues.monthlyDue + dues.funeralDue;
+
+    if (totalDue > 0) {
+        container.innerHTML = `
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="font-bold text-amber-800"><i class="fa-solid fa-circle-exclamation mr-1"></i> Outstanding Dues</span>
+                    <button type="button" onclick="window.autoFillDues(${matched.id})" class="bg-amber-600 text-white px-2 py-1 rounded hover:bg-amber-700 transition-colors font-bold">Auto-fill All</button>
+                </div>
+                <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-amber-700">
+                    <span>ඇතුලත්වීමේ ගාස්තු ලැබීම්:</span><span class="text-right font-semibold">Rs. ${dues.entranceDue.toFixed(2)}</span>
+                    <span>මාසික ගාස්තු ලැබීම්:</span><span class="text-right font-semibold">Rs. ${dues.monthlyDue.toFixed(2)}</span>
+                    <span>සුභ සාධක අරමුදල් ලැබීම් (${dues.funeralCount}):</span><span class="text-right font-semibold">Rs. ${dues.funeralDue.toFixed(2)}</span>
+                </div>
+            </div>
+        `;
+        container.classList.remove('hidden');
+    } else {
+        container.innerHTML = `<div class="text-xs text-green-600 font-medium"><i class="fa-solid fa-check-circle mr-1"></i> No outstanding dues found for this member.</div>`;
+        container.classList.remove('hidden');
+    }
+};
+
+window.getMemberDues = async (memberId) => {
+    const member = await db.members.get(memberId);
+    if (!member) return { entranceDue: 0, monthlyDue: 0, funeralDue: 0, funeralCount: 0 };
+
+    const accounts = await db.accounts.toArray();
+    const entranceAcc = accounts.find(a => a.accountName === 'ඇතුලත්වීමේ ගාස්තු ලැබීම්' || a.accountName.includes('Entrance Fee'));
+    const monthly100Acc = accounts.find(a => a.accountName === 'දායක අරමුදල් ලැබීම්' || a.accountName.includes('Monthly Contribution (Rs. 100)'));
+    const monthly200Acc = accounts.find(a => a.accountName === 'සාමාජික අරමුදල් ලැබීම්' || a.accountName.includes('Monthly Membership (Rs. 200)'));
+    const funeralAcc = accounts.find(a => a.accountName === 'සුභ සාධක අරමුදල් ලැබීම්' || a.accountName.includes('Funeral Contribution (Rs. 200)'));
+
+    // 1. Entrance Fee (Max 13,000)
+    let entrancePaid = 0;
+    if (entranceAcc) {
+        const entranceEntries = await db.entries.where('accountId').equals(entranceAcc.id).toArray();
+        for (let e of entranceEntries) {
+            const tx = await db.transactions.get(e.transactionId);
+            if (tx && tx.memberId === memberId && tx.status !== 'Cancelled') {
+                entrancePaid += (parseFloat(e.credit) || 0);
+            }
+        }
+    }
+    const entranceDue = Math.max(0, 13000 - (entrancePaid + (member.openingEntrancePaid || 0)));
+
+    // 2. Monthly Dues (Rs. 300 total)
+    // Rule: Joining month is FREE if entrance fee is paid/paying. Start from next month.
+    let monthlyDue = 0;
+    if (member.joinedDate && member.joinedDate !== '') {
+        const lastPaidStr = member.openingPaidUntil; // e.g. "2026-04"
+        let referenceDate = new Date(member.joinedDate);
+
+        if (lastPaidStr) {
+            // If they paid until April 2026, then we start calculating arrears from May 2026.
+            // So referenceDate should be Apr 2026.
+            referenceDate = new Date(lastPaidStr + "-01");
+        }
+
+        const now = new Date();
+        // Calculate months diff from reference month to current month
+        let monthsDiff = (now.getFullYear() - referenceDate.getFullYear()) * 12 + (now.getMonth() - referenceDate.getMonth());
+
+        if (monthsDiff > 0) {
+            const totalMonthlyExpected = monthsDiff * 300;
+            let monthlyPaid = 0;
+            if (monthly100Acc || monthly200Acc) {
+                const mEntries = await db.entries.where('accountId').anyOf([monthly100Acc?.id, monthly200Acc?.id].filter(id => id)).toArray();
+                for (let e of mEntries) {
+                    const tx = await db.transactions.get(e.transactionId);
+                    if (tx && tx.memberId === memberId && tx.status !== 'Cancelled') {
+                        monthlyPaid += (parseFloat(e.credit) || 0);
+                    }
+                }
+            }
+            monthlyDue = Math.max(0, totalMonthlyExpected - monthlyPaid);
+        }
+    }
+
+    // 3. Funeral Dues (Rs. 200 each)
+    // Rules: 
+    // - Not for own home funeral.
+    // - Not for new members first 6 months.
+    let funeralDue = 0;
+    let validFuneralCount = 0;
+    if (member.joinedDate && funeralAcc) {
+        const joinDate = new Date(member.joinedDate);
+        const gracePeriodEnd = new Date(joinDate);
+        gracePeriodEnd.setMonth(gracePeriodEnd.getMonth() + 6);
+
+        const allFunerals = await db.funerals.toArray();
+        const eligibleFunerals = allFunerals.filter(f => {
+            const fDate = new Date(f.date);
+            return f.memberId !== memberId && fDate > gracePeriodEnd;
+        });
+
+        validFuneralCount = eligibleFunerals.length;
+        const totalFuneralExpected = validFuneralCount * 200;
+
+        let funeralPaid = 0;
+        const fEntries = await db.entries.where('accountId').equals(funeralAcc.id).toArray();
+        for (let e of fEntries) {
+            const tx = await db.transactions.get(e.transactionId);
+            if (tx && tx.memberId === memberId && tx.status !== 'Cancelled') {
+                funeralPaid += (parseFloat(e.credit) || 0);
+            }
+        }
+        funeralDue = Math.max(0, totalFuneralExpected - funeralPaid);
+    }
+
+    return { entranceDue, monthlyDue, funeralDue, funeralCount: validFuneralCount };
+};
+
+window.autoFillDues = async (memberId) => {
+    const dues = await window.getMemberDues(memberId);
+    const container = document.getElementById('txLinesContainer');
+    if (!container) return;
+
+    container.innerHTML = ''; // Clear existing lines
+
+    const accounts = await db.accounts.toArray();
+    const entranceAcc = accounts.find(a => a.accountName === 'ඇතුලත්වීමේ ගාස්තු ලැබීම්' || a.accountName.includes('Entrance Fee'));
+    const monthly100Acc = accounts.find(a => a.accountName === 'දායක අරමුදල් ලැබීම්' || a.accountName.includes('Monthly Contribution (Rs. 100)'));
+    const monthly200Acc = accounts.find(a => a.accountName === 'සාමාජික අරමුදල් ලැබීම්' || a.accountName.includes('Monthly Membership (Rs. 200)'));
+    const funeralAcc = accounts.find(a => a.accountName === 'සුභ සාධක අරමුදල් ලැබීම්' || a.accountName.includes('Funeral Contribution (Rs. 200)'));
+
+    if (dues.entranceDue > 0 && entranceAcc) {
+        window.addTxLineWithAmount(entranceAcc.id, dues.entranceDue);
+    }
+    if (dues.monthlyDue > 0) {
+        // Split monthly due into 100 (Contribution) and 200 (Membership) proportionally if possible
+        // For simplicity, if they owe 300, we do 100/200.
+        const monthsOwed = Math.ceil(dues.monthlyDue / 300);
+        if (monthly100Acc) window.addTxLineWithAmount(monthly100Acc.id, monthsOwed * 100);
+        if (monthly200Acc) window.addTxLineWithAmount(monthly200Acc.id, monthsOwed * 200);
+    }
+    if (dues.funeralDue > 0 && funeralAcc) {
+        window.addTxLineWithAmount(funeralAcc.id, dues.funeralDue);
+    }
+
+    window.calculateTxTotal();
+};
+
+window.addTxLineWithAmount = (accountId, amount) => {
+    window.addTxLineRow(accountId);
+    const rows = document.getElementById('txLinesContainer').children;
+    const lastRow = rows[rows.length - 1];
+    const amountInput = lastRow.querySelector('input[name="lineAmount[]"]');
+    if (amountInput) amountInput.value = amount;
+};
+
+// Funeral Management
+window.openFuneralModal = async () => {
+    const members = await db.members.toArray();
+    const memOptions = members.map(m => `<option value="${m.id}">${m.memberNo} - ${m.name}</option>`).join('');
+
+    const funerals = (await db.funerals.toArray()).reverse();
+    const funeralRows = funerals.map(f => {
+        const m = members.find(mem => mem.id === f.memberId);
+        return `
+            <tr class="border-b border-gray-100 hover:bg-gray-50">
+                <td class="px-4 py-3 text-sm text-gray-600">${f.date}</td>
+                <td class="px-4 py-3 text-sm font-medium text-gray-800">${m ? m.name : 'Unknown'}</td>
+                <td class="px-4 py-3 text-sm text-gray-600">${f.description || '-'}</td>
+                <td class="px-4 py-3 text-right">
+                    <button onclick="window.deleteFuneral(${f.id})" class="text-red-400 hover:text-red-600 transition-colors"><i class="fa-solid fa-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    const html = `
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-bold text-gray-800">Funeral Events Log</h3>
+            <button onclick="window.showAddFuneralForm()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-gray-400/30">+ Record New Event</button>
+        </div>
+
+        <div id="funeralFormContainer" class="hidden mb-6 bg-gray-50 p-6 rounded-2xl border border-gray-200 animate-fade-in">
+            <form onsubmit="window.saveFuneral(event)" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Event Date</label>
+                        <input type="date" id="fDate" required value="${new Date().toISOString().split('T')[0]}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 outline-none transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Associated Member</label>
+                        <select id="fMember" required class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 outline-none transition-all bg-white">
+                            <option value="" disabled selected>Select Member</option>
+                            ${memOptions}
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description / Note</label>
+                    <textarea id="fDesc" rows="2" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 outline-none transition-all resize-none" placeholder="Details about the funeral..."></textarea>
+                </div>
+                <div class="flex justify-end gap-3 text-sm">
+                    <button type="button" onclick="window.showAddFuneralForm(false)" class="text-gray-500 font-bold px-4 py-2">Cancel</button>
+                    <button type="submit" class="bg-brand-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-brand-500/30">Save Event Record</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="max-h-[50vh] overflow-auto rounded-xl border border-gray-200 custom-scrollbar">
+            <table class="w-full text-left">
+                <thead class="bg-gray-100 sticky top-0">
+                    <tr>
+                        <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Date</th>
+                        <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Member Home</th>
+                        <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Description</th>
+                        <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50 bg-white">
+                    ${funeralRows || '<tr><td colspan="4" class="text-center py-8 text-gray-400 italic">No funeral events recorded yet.</td></tr>'}
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    window.utils.showModal(html);
+};
+
+window.showAddFuneralForm = (show = true) => {
+    const el = document.getElementById('funeralFormContainer');
+    if (el) el.classList.toggle('hidden', !show);
+};
+
+window.saveFuneral = async (e) => {
+    e.preventDefault();
+    try {
+        const date = document.getElementById('fDate').value;
+        const memberId = parseInt(document.getElementById('fMember').value);
+        const description = document.getElementById('fDesc').value;
+
+        await db.funerals.add({ date, memberId, description });
+        window.utils.showToast("Funeral event logged. Billing will be adjusted automatically.");
+        window.openFuneralModal(); // Refresh
+    } catch (err) {
+        console.error(err);
+        window.utils.showToast("Error recording event", "error");
+    }
+};
+
+window.deleteFuneral = async (id) => {
+    if (confirm("Remove this funeral record?")) {
+        await db.funerals.delete(id);
+        window.openFuneralModal();
+    }
+};

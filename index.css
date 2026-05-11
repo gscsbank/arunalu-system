@@ -1,0 +1,161 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --brand-primary: #1e40af;
+    /* Deep Royal Blue */
+    --brand-secondary: #059669;
+    /* Solid Emerald */
+    --bg-main: #f1f5f9;
+    /* Light slate bg */
+    --bg-sidebar: #1e293b;
+    /* Slate-800 */
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    line-height: 1.5;
+}
+
+/* Page Elements */
+.card {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    border-radius: 8px;
+    /* Sharper corners for enterprise feel */
+}
+
+.card-header {
+    border-bottom: 1px solid var(--border-color);
+    padding: 1rem 1.5rem;
+}
+
+/* Sidebar (Light Enterprise) */
+#sidebar {
+    background-color: #ffffff;
+    color: var(--text-muted);
+}
+
+.nav-link {
+    transition: all 0.2s ease;
+    border-radius: 0 8px 8px 0;
+    margin: 0.125rem 0 0.125rem 0;
+    /* Align to left edge for the accent border */
+    padding: 0.75rem 1.5rem;
+    color: var(--text-muted);
+    border-left: 3px solid transparent;
+    font-weight: 600;
+    /* Increased to semibold as requested */
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.nav-link i {
+    font-size: 1.1rem;
+    /* Slightly larger icons */
+    width: 20px;
+    text-align: center;
+}
+
+.nav-link:hover {
+    background: #f8fafc;
+    color: var(--text-main);
+}
+
+.nav-link.active-nav {
+    background: #eff6ff;
+    color: var(--brand-primary);
+    border-left-color: var(--brand-primary);
+}
+
+/* Navigation Accent */
+.active-nav i {
+    color: white !important;
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+/* Buttons */
+.btn-primary {
+    background-color: var(--brand-primary);
+    color: white;
+    font-weight: 500;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+
+.btn-primary:hover {
+    filter: brightness(1.1);
+}
+
+/* Form Styles */
+input,
+select,
+textarea {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+}
+
+/* Typography Overrides */
+h1,
+h2,
+h3,
+h4 {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.glass-panel {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    border-radius: 8px;
+}
+
+/* Print */
+@media print {
+    body {
+        background: white;
+        color: black;
+    }
+
+    #sidebar,
+    header,
+    .no-print {
+        display: none !important;
+    }
+
+    #app-content {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+}
