@@ -2,32 +2,32 @@
 async function renderTransactions() {
     return `
         <div class="glass-panel p-6 rounded-2xl h-full flex flex-col">
-            <div class="flex justify-between items-center mb-6">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div>
                     <h3 class="text-xl font-bold text-gray-800">Transactions Ledger</h3>
-                    <p class="text-sm text-gray-500">Record receipts, payments, and view journal entries</p>
+                    <p class="text-sm text-gray-500">Record receipts, payments, and journal entries</p>
                 </div>
-                <div class="flex gap-2">
-                    <button onclick="openTransactionModal('Receipt')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-lg shadow-green-500/30">
+                <div class="flex flex-wrap gap-2 w-full md:w-auto">
+                    <button onclick="openTransactionModal('Receipt')" class="flex-1 md:flex-none bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 shadow-lg shadow-green-500/30 text-sm">
                         <i class="fa-solid fa-arrow-down"></i> Receipt
                     </button>
-                    <button onclick="openTransactionModal('Payment')" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-lg shadow-red-500/30">
+                    <button onclick="openTransactionModal('Payment')" class="flex-1 md:flex-none bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 shadow-lg shadow-red-500/30 text-sm">
                         <i class="fa-solid fa-arrow-up"></i> Payment
                     </button>
-                    <button onclick="openTransferModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-lg shadow-blue-500/30 ml-2 border border-blue-500">
+                    <button onclick="openTransferModal()" class="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30 border border-blue-500 text-sm">
                         <i class="fa-solid fa-exchange-alt"></i> Transfer
                     </button>
-                    <button onclick="window.openFuneralModal()" class="bg-gray-800 hover:bg-black text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-lg shadow-gray-500/30 ml-2">
-                        <i class="fa-solid fa-cross"></i> Deaths/Funerals
+                    <button onclick="window.openFuneralModal()" class="flex-1 md:flex-none bg-gray-800 hover:bg-black text-white px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 shadow-lg shadow-gray-500/30 text-sm">
+                        <i class="fa-solid fa-cross"></i> Deaths
                     </button>
                 </div>
             </div>
             
             <!-- Quick Filters -->
-            <div class="mb-6 flex gap-3">
-                <input type="date" id="txStartDate" class="px-4 py-2 rounded-xl border border-gray-200 focus:border-brand-500 bg-white/50">
-                <input type="date" id="txEndDate" class="px-4 py-2 rounded-xl border border-gray-200 focus:border-brand-500 bg-white/50">
-                <button onclick="loadTransactionsTable()" class="bg-brand-50 text-brand-600 px-4 py-2 rounded-xl border border-brand-100 hover:bg-brand-100 font-medium">Filter</button>
+            <div class="mb-6 flex flex-wrap gap-2">
+                <input type="date" id="txStartDate" class="flex-1 md:flex-none px-4 py-2 rounded-xl border border-gray-200 focus:border-brand-500 bg-white/50 text-sm">
+                <input type="date" id="txEndDate" class="flex-1 md:flex-none px-4 py-2 rounded-xl border border-gray-200 focus:border-brand-500 bg-white/50 text-sm">
+                <button onclick="loadTransactionsTable()" class="w-full md:w-auto bg-brand-50 text-brand-600 px-6 py-2 rounded-xl border border-brand-100 hover:bg-brand-100 font-bold text-sm">Filter</button>
             </div>
 
             <!-- Table -->
@@ -209,7 +209,7 @@ window.openTransactionModal = async (type) => {
         <h3 class="text-xl font-bold text-gray-800 mb-6">${title}</h3>
         <form id="txForm" class="space-y-5 max-h-[75vh] overflow-y-auto px-1 custom-scrollbar" onsubmit="window.saveTransaction(event, '${type}')">
             
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Date <span class="text-red-500">*</span></label>
                     <input type="date" id="txDate" required value="${new Date().toISOString().split('T')[0]}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
@@ -220,9 +220,10 @@ window.openTransactionModal = async (type) => {
                 </div>
             </div>
             
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <input list="membersList" id="txPayerInput" onchange="window.handleTxMemberSelection(this.value)" oninput="window.handleTxMemberSelection(this.value)" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all bg-white" placeholder="Search member, or type any name..." autocomplete="off">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Payer / Member</label>
+                    <input list="membersList" id="txPayerInput" onchange="window.handleTxMemberSelection(this.value)" oninput="window.handleTxMemberSelection(this.value)" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all bg-white" placeholder="Search member..." autocomplete="off">
                     <datalist id="membersList">
                         ${memOptions}
                     </datalist>
@@ -260,12 +261,12 @@ window.openTransactionModal = async (type) => {
                 <textarea id="txDesc" rows="2" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all resize-none" placeholder="Provide transaction details..."></textarea>
             </div>
             
-            <div class="pt-4 border-t border-gray-100 flex justify-end gap-3 sticky bottom-0 bg-white/90 backdrop-blur-md pb-2 mt-4">
-                <button type="button" onclick="window.utils.closeModal()" class="px-5 py-2.5 rounded-lg text-gray-600 font-medium hover:bg-gray-100 transition-colors">Cancel</button>
-                <button type="button" onclick="window.saveTransaction(event, '${type}', true)" class="bg-gray-800 hover:bg-black text-white px-6 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-gray-500/30">
-                    <i class="fa-solid fa-print mr-2"></i> Save & Print
+            <div class="pt-4 border-t border-gray-100 flex flex-wrap justify-end gap-2 sticky bottom-0 bg-white/95 backdrop-blur-md pb-2 mt-4">
+                <button type="button" onclick="window.utils.closeModal()" class="flex-1 md:flex-none px-4 py-2.5 rounded-lg text-gray-600 font-medium hover:bg-gray-100 transition-colors text-sm">Cancel</button>
+                <button type="button" onclick="window.saveTransaction(event, '${type}', true)" class="flex-1 md:flex-none bg-gray-800 hover:bg-black text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-gray-500/30 text-sm">
+                    <i class="fa-solid fa-print"></i> Save & Print
                 </button>
-                <button type="submit" class="bg-${btnColor}-600 hover:bg-${btnColor}-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-${btnColor}-500/30">
+                <button type="submit" class="w-full md:w-auto bg-${btnColor}-600 hover:bg-${btnColor}-700 text-white px-6 py-2.5 rounded-lg font-bold transition-colors shadow-lg shadow-${btnColor}-500/30 text-sm">
                     <i class="fa-solid fa-save mr-2"></i> Save Only
                 </button>
             </div>
@@ -632,58 +633,71 @@ window.printTransaction = async (id) => {
             </div>
         `;
     } else {
-        // Standard Thermal Layout for Receipts/Transfers
+        // Standard Thermal Layout for Receipts/Transfers - Optimized for 55mm Bluetooth Printers
+        let statusTagHtml = '';
+        if (tx.memberId && tx.type === 'Receipt') {
+            const dues = await window.getMemberDues(tx.memberId);
+            if (dues.isInvalid) {
+                statusTagHtml = `<div style="text-align: center; border: 1px solid black; margin: 4px 0; font-size: 10px; font-weight: bold;">INVALID MEMBERSHIP</div>`;
+            } else if (dues.isNewMember) {
+                statusTagHtml = `<div style="text-align: center; border: 1px solid black; margin: 4px 0; font-size: 10px; font-weight: bold;">NEW MEMBER (GRACE)</div>`;
+            }
+        }
+
         printArea.innerHTML = `
-            <div style="width: 58mm; max-width: 58mm; margin: 0 auto; padding: 2mm 2mm; font-family: 'Inter', 'Iskoola Pota', 'Nirmala UI', sans-serif; font-size: 11px; line-height: 1.3; color: black; background: white;">
+            <div style="width: 55mm; max-width: 55mm; margin: 0 auto; padding: 1mm; font-family: 'Inter', 'Iskoola Pota', 'Nirmala UI', sans-serif; font-size: 10px; line-height: 1.2; color: black; background: white;">
                 
-                <div style="text-align: center; margin-bottom: 8px;">
-                    <h1 style="font-size: 14px; font-weight: bold; margin: 0; line-height: 1.2; text-transform: uppercase;">Arunalu Welfare Society</h1>
-                    <div style="font-size: 9px; font-weight: bold;">Galapitiyagama, Nikaweratiya</div>
-                    <div style="font-size: 8px; font-weight: bold; color: #444; margin-bottom: 4px; text-transform: uppercase;">Galapitiyagama Sanasa Society <br> Welfare Branch</div>
-                    <div style="margin-top: 4px; font-weight: bold; text-decoration: underline; font-size: 13px;">${title}</div>
+                <div style="text-align: center; margin-bottom: 6px;">
+                    <h1 style="font-size: 13px; font-weight: 900; margin: 0; line-height: 1.1; text-transform: uppercase;">Arunalu Welfare Society</h1>
+                    <div style="font-size: 8px; font-weight: bold;">Galapitiyagama, Nikaweratiya</div>
+                    <div style="font-size: 7px; font-weight: bold; color: #333; margin-bottom: 3px; text-transform: uppercase;">Galapitiyagama Sanasa Society <br> Welfare Branch</div>
+                    <div style="margin-top: 3px; font-weight: 900; text-decoration: underline; font-size: 14px; letter-spacing: 1px;">${title}</div>
                 </div>
                 
-                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                ${statusTagHtml}
+
+                <div style="display: flex; justify-content: space-between; margin-bottom: 1px;">
                     <span>Date:</span>
-                    <span style="font-weight: bold;">${tx.date}</span>
+                    <span style="font-weight: 900;">${tx.date}</span>
                 </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
                     <span>Ref:</span>
-                    <span style="font-weight: bold;">${tx.reference || '-'}</span>
+                    <span style="font-weight: 900;">${tx.reference || '-'}</span>
                 </div>
 
-                <div style="border-top: 1px dashed black; border-bottom: 1px dashed black; padding: 4px 0; margin-bottom: 6px;">
-                    <div style="margin-bottom: 2px;">${tx.type === 'Receipt' ? 'From:' : 'To:'}</div>
-                    <div style="font-weight: bold; font-size: 12px; line-height: 1.2;">${memberLabel}</div>
+                <div style="border-top: 1px dashed black; border-bottom: 1px dashed black; padding: 3px 0; margin-bottom: 4px;">
+                    <div style="margin-bottom: 1px; font-size: 8px;">${tx.type === 'Receipt' ? 'PAYER:' : 'PAYEE:'}</div>
+                    <div style="font-weight: 900; font-size: 11px; line-height: 1.1;">${memberLabel}</div>
                 </div>
 
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 11px;">
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 4px; font-size: 10px;">
                     <tbody>
                         ${linesHtml}
                     </tbody>
                 </table>
 
-                <div style="border-top: 1px dashed black; padding: 4px 0; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: bold; font-size: 13px;">TOTAL:</span>
-                    <span style="font-weight: bold; font-size: 14px;">Rs. ${total.toFixed(2)}</span>
+                <div style="border-top: 1px solid black; padding: 4px 0; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 900; font-size: 12px;">TOTAL:</span>
+                    <span style="font-weight: 900; font-size: 13px;">Rs. ${total.toFixed(2)}</span>
                 </div>
 
                 ${tx.description ? `
-                <div style="margin-bottom: 12px; font-size: 10px;">
-                    <span style="border-bottom: 1px solid black; display: inline-block; margin-bottom: 2px;">Memo:</span><br>
-                    <span style="line-height: 1.2;">${tx.description}</span>
+                <div style="margin-bottom: 8px; font-size: 9px;">
+                    <span style="text-decoration: underline; display: inline-block; margin-bottom: 1px;">Memo:</span><br>
+                    <span style="line-height: 1.1;">${tx.description}</span>
                 </div>` : ''}
 
-                <div style="margin-top: 25px; text-align: center; display: flex; justify-content: space-between;">
-                    <div style="border-top: 1px solid black; width: 45%; font-size: 9px; padding-top: 2px;">Member</div>
-                    <div style="border-top: 1px solid black; width: 45%; font-size: 9px; padding-top: 2px;">භාණ්ඩාගාරික (Treasurer)</div>
+                <div style="margin-top: 20px; text-align: center; display: flex; justify-content: space-between; gap: 5px;">
+                    <div style="border-top: 1px solid black; width: 48%; font-size: 8px; padding-top: 2px; font-weight: bold;">Member/Payer</div>
+                    <div style="border-top: 1px solid black; width: 48%; font-size: 8px; padding-top: 2px; font-weight: bold;">Treasurer</div>
                 </div>
 
                 ${arrearsHtml}
 
-                <div style="text-align: center; margin-top: 15px; font-size: 9px;">
-                    Thank You!
+                <div style="text-align: center; margin-top: 12px; font-size: 8px; font-weight: bold; border-top: 1px dashed #ccc; pt-2">
+                    THANK YOU! - IRRASOFT SOLUTION
                 </div>
+                <div style="height: 10mm;"></div> <!-- Extra space for tearing -->
             </div>
         `;
     }
@@ -874,8 +888,47 @@ window.handleTxMemberSelection = async (value) => {
     const dues = await window.getMemberDues(matched.id);
     const totalDue = dues.entranceDue + dues.monthlyDue + dues.funeralDue;
 
-    if (totalDue > 0) {
+    let warningHtml = '';
+    if (dues.isInvalid) {
+        warningHtml = `
+            <div class="mb-3 bg-red-50 border border-red-200 rounded-xl p-4">
+                <div class="flex items-center gap-3 text-red-700 mb-3">
+                    <i class="fa-solid fa-circle-xmark text-xl animate-pulse"></i>
+                    <div>
+                        <div class="font-bold text-sm">සාමාජිකත්වය අවලංගු වී ඇත! (Membership Invalid)</div>
+                        <div class="text-xs opacity-80">මාස 6කට වඩා හිඟ මුදල් පවතී.</div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button type="button" onclick="window.renewMemberMembership(${matched.id})" class="bg-red-600 text-white py-2 rounded-lg font-bold hover:bg-red-700 transition-colors text-[10px] uppercase tracking-wider shadow-md">
+                        Renew as New Member (රු. 13,000)
+                    </button>
+                    <button type="button" onclick="this.parentElement.parentElement.remove(); window.autoFillDues(${matched.id});" class="bg-amber-600 text-white py-2 rounded-lg font-bold hover:bg-amber-700 transition-colors text-[10px] uppercase tracking-wider shadow-md">
+                        Pay Arrears (හිඟ මුදල් ගෙවන්න)
+                    </button>
+                </div>
+                <div class="mt-2 text-[9px] text-center text-red-400 font-bold italic">
+                    * හිඟ මුදල් පමණක් ගෙවීමට සභාපතිතුමාගේ අනුමැතිය අවශ්‍ය වේ.
+                </div>
+            </div>
+        `;
+    } else if (dues.isNewMember) {
+        warningHtml = `
+            <div class="mb-3 bg-blue-50 border border-blue-200 rounded-xl p-3">
+                <div class="flex items-center gap-3 text-blue-700">
+                    <i class="fa-solid fa-circle-info text-lg"></i>
+                    <div>
+                        <div class="font-bold text-[11px]">නව සාමාජික (New Member - Grace Period)</div>
+                        <div class="text-[10px] opacity-80">ඇතුලත්වීමේ ගාස්තුව රු. 13,000 මාස 6ක් තුල ගෙවා නිම කළ යුතුය. මරණාධාර ලබා ගැනීමට පෙර සම්පූර්ණ මුදල ගෙවිය යුතුය.</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    if (totalDue > 0 || dues.isInvalid || dues.isNewMember) {
         container.innerHTML = `
+            ${warningHtml}
             <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs">
                 <div class="flex justify-between items-center mb-2">
                     <span class="font-bold text-amber-800"><i class="fa-solid fa-circle-exclamation mr-1"></i> Outstanding Dues</span>
@@ -895,9 +948,33 @@ window.handleTxMemberSelection = async (value) => {
     }
 };
 
+window.renewMemberMembership = async (memberId) => {
+    if (!confirm("Are you sure you want to renew this membership? This will reset the join date to today and apply the Rs. 13,000 new member fee.")) return;
+
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        await db.members.update(memberId, {
+            joinedDate: today,
+            openingEntrancePaid: 0,
+            openingPaidUntil: ''
+        });
+
+        window.utils.showToast("Membership renewed as a New Member.");
+        
+        // Refresh the dues display
+        const payerInput = document.getElementById('txPayerInput');
+        if (payerInput) {
+            window.handleTxMemberSelection(payerInput.value);
+        }
+    } catch (err) {
+        console.error(err);
+        window.utils.showToast("Error renewing membership", "error");
+    }
+};
+
 window.getMemberDues = async (memberId) => {
     const member = await db.members.get(memberId);
-    if (!member) return { entranceDue: 0, monthlyDue: 0, funeralDue: 0, funeralCount: 0 };
+    if (!member) return { entranceDue: 0, monthlyDue: 0, funeralDue: 0, funeralCount: 0, isInvalid: false, isNewMember: false, monthsBehind: 0 };
 
     const accounts = await db.accounts.toArray();
     const entranceAcc = accounts.find(a => a.accountName === 'ඇතුලත්වීමේ ගාස්තු ලැබීම්' || a.accountName.includes('Entrance Fee'));
@@ -905,13 +982,17 @@ window.getMemberDues = async (memberId) => {
     const monthly200Acc = accounts.find(a => a.accountName === 'සාමාජික අරමුදල් ලැබීම්' || a.accountName.includes('Monthly Membership (Rs. 200)'));
     const funeralAcc = accounts.find(a => a.accountName === 'සුභ සාධක අරමුදල් ලැබීම්' || a.accountName.includes('Funeral Contribution (Rs. 200)'));
 
+    const joinDateStr = member.joinedDate || '';
+    const joinDate = new Date(joinDateStr);
+
     // 1. Entrance Fee (Max 13,000)
     let entrancePaid = 0;
     if (entranceAcc) {
         const entranceEntries = await db.entries.where('accountId').equals(entranceAcc.id).toArray();
         for (let e of entranceEntries) {
             const tx = await db.transactions.get(e.transactionId);
-            if (tx && tx.memberId === memberId && tx.status !== 'Cancelled') {
+            // Rule: Only count payments made after or on the current joinDate
+            if (tx && tx.memberId === memberId && tx.status !== 'Cancelled' && tx.date >= joinDateStr) {
                 entrancePaid += (parseFloat(e.credit) || 0);
             }
         }
@@ -919,52 +1000,49 @@ window.getMemberDues = async (memberId) => {
     const entranceDue = Math.max(0, 13000 - (entrancePaid + (member.openingEntrancePaid || 0)));
 
     // 2. Monthly Dues (Rs. 300 total)
-    // Rule: Joining month is FREE if entrance fee is paid/paying. Start from next month.
     let monthlyDue = 0;
-    if (member.joinedDate && member.joinedDate !== '') {
-        const lastPaidStr = member.openingPaidUntil; // e.g. "2026-04"
-        let referenceDate = new Date(member.joinedDate);
+    let monthsBehind = 0;
+    if (joinDateStr !== '') {
+        const lastPaidStr = member.openingPaidUntil; 
+        let referenceDate = new Date(joinDateStr);
 
         if (lastPaidStr) {
-            // If they paid until April 2026, then we start calculating arrears from May 2026.
-            // So referenceDate should be Apr 2026.
             referenceDate = new Date(lastPaidStr + "-01");
         }
 
         const now = new Date();
-        // Calculate months diff from reference month to current month
-        let monthsDiff = (now.getFullYear() - referenceDate.getFullYear()) * 12 + (now.getMonth() - referenceDate.getMonth());
+        monthsBehind = (now.getFullYear() - referenceDate.getFullYear()) * 12 + (now.getMonth() - referenceDate.getMonth());
 
-        if (monthsDiff > 0) {
-            const totalMonthlyExpected = monthsDiff * 300;
+        if (monthsBehind > 0) {
+            const totalMonthlyExpected = monthsBehind * 300;
             let monthlyPaid = 0;
             if (monthly100Acc || monthly200Acc) {
                 const mEntries = await db.entries.where('accountId').anyOf([monthly100Acc?.id, monthly200Acc?.id].filter(id => id)).toArray();
                 for (let e of mEntries) {
                     const tx = await db.transactions.get(e.transactionId);
-                    if (tx && tx.memberId === memberId && tx.status !== 'Cancelled') {
+                    // Rule: Only count payments made after or on the current joinDate
+                    if (tx && tx.memberId === memberId && tx.status !== 'Cancelled' && tx.date >= joinDateStr) {
                         monthlyPaid += (parseFloat(e.credit) || 0);
                     }
                 }
             }
             monthlyDue = Math.max(0, totalMonthlyExpected - monthlyPaid);
+            // Re-calculate actual months behind based on remaining balance
+            monthsBehind = Math.floor(monthlyDue / 300);
         }
     }
 
     // 3. Funeral Dues (Rs. 200 each)
-    // Rules: 
-    // - Not for own home funeral.
-    // - Not for new members first 6 months.
     let funeralDue = 0;
     let validFuneralCount = 0;
-    if (member.joinedDate && funeralAcc) {
-        const joinDate = new Date(member.joinedDate);
+    if (joinDateStr !== '' && funeralAcc) {
         const gracePeriodEnd = new Date(joinDate);
         gracePeriodEnd.setMonth(gracePeriodEnd.getMonth() + 6);
 
         const allFunerals = await db.funerals.toArray();
         const eligibleFunerals = allFunerals.filter(f => {
             const fDate = new Date(f.date);
+            // Rule: Not for own home, and only funerals after 6 months of joining
             return f.memberId !== memberId && fDate > gracePeriodEnd;
         });
 
@@ -975,14 +1053,29 @@ window.getMemberDues = async (memberId) => {
         const fEntries = await db.entries.where('accountId').equals(funeralAcc.id).toArray();
         for (let e of fEntries) {
             const tx = await db.transactions.get(e.transactionId);
-            if (tx && tx.memberId === memberId && tx.status !== 'Cancelled') {
+            // Rule: Only count payments made after or on the current joinDate
+            if (tx && tx.memberId === memberId && tx.status !== 'Cancelled' && tx.date >= joinDateStr) {
                 funeralPaid += (parseFloat(e.credit) || 0);
             }
         }
         funeralDue = Math.max(0, totalFuneralExpected - funeralPaid);
     }
 
-    return { entranceDue, monthlyDue, funeralDue, funeralCount: validFuneralCount };
+    // Membership Status Flags
+    const isInvalid = monthsBehind >= 6;
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    const isNewMember = joinDate > sixMonthsAgo;
+
+    return { 
+        entranceDue, 
+        monthlyDue, 
+        funeralDue, 
+        funeralCount: validFuneralCount,
+        isInvalid,
+        isNewMember,
+        monthsBehind
+    };
 };
 
 window.autoFillDues = async (memberId) => {

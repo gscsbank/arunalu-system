@@ -2,12 +2,12 @@
 async function renderMembers() {
     return `
         <div class="glass-panel p-6 rounded-2xl h-full flex flex-col">
-            <div class="flex justify-between items-center mb-6">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div>
                     <h3 class="text-xl font-bold text-gray-800">Member Management</h3>
                     <p class="text-sm text-gray-500">Manage welfare society members</p>
                 </div>
-                <button onclick="openMemberModal()" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-lg shadow-brand-500/30">
+                <button onclick="openMemberModal()" class="w-full md:w-auto bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-brand-500/30 text-sm">
                     <i class="fa-solid fa-plus"></i> Add New Member
                 </button>
             </div>
@@ -173,21 +173,26 @@ window.viewMemberProfile = async (id) => {
         </h3>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div class="bg-gray-50 rounded-xl p-5 border border-gray-100 shadow-sm col-span-2">
-                <h4 class="text-sm font-semibold text-brand-600 mb-3 uppercase tracking-wide border-b border-gray-200 pb-2">About Member</h4>
-                <div class="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm">
-                    <p class="flex items-start"><span class="text-gray-500 w-28 shrink-0">Member No:</span> <span class="font-medium text-gray-800">${member.memberNo || '-'}</span></p>
-                    <p class="flex items-start"><span class="text-gray-500 w-28 shrink-0">Joined Date:</span> <span class="font-medium text-gray-800">${member.joinedDate || '-'}</span></p>
-                    <p class="flex items-start col-span-2"><span class="text-gray-500 w-28 shrink-0">Full Name:</span> <span class="font-medium text-gray-800">${rawName}</span></p>
-                    <p class="flex items-start"><span class="text-gray-500 w-28 shrink-0">NIC:</span> <span class="font-medium text-gray-800">${member.nic || '-'}</span></p>
-                    <p class="flex items-start"><span class="text-gray-500 w-28 shrink-0">Phone:</span> <span class="font-medium text-gray-800">${member.phone || '-'}</span></p>
-                    <p class="flex items-start col-span-2"><span class="text-gray-500 w-28 shrink-0">Address:</span> <span class="font-medium text-gray-800">${member.address || '-'}</span></p>
+            <div class="bg-gray-50 rounded-xl p-4 md:p-5 border border-gray-100 shadow-sm md:col-span-2">
+                <h4 class="text-sm font-black text-brand-600 mb-4 uppercase tracking-widest border-b border-gray-200 pb-2">About Member</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                    <p class="flex flex-col sm:flex-row sm:items-center"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">Member No:</span> <span class="font-bold text-gray-800">${member.memberNo || '-'}</span></p>
+                    <p class="flex flex-col sm:flex-row sm:items-center"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">Joined Date:</span> <span class="font-bold text-gray-800">${member.joinedDate || '-'}</span></p>
+                    <p class="flex flex-col sm:flex-row sm:items-center sm:col-span-2"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">Full Name:</span> <span class="font-bold text-gray-800">${rawName}</span></p>
+                    <p class="flex flex-col sm:flex-row sm:items-center"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">NIC:</span> <span class="font-bold text-gray-800">${member.nic || '-'}</span></p>
+                    <p class="flex flex-col sm:flex-row sm:items-center"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">Phone:</span> <span class="font-bold text-gray-800">${member.phone || '-'}</span></p>
+                    <p class="flex flex-col sm:flex-row sm:items-start sm:col-span-2"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">Address:</span> <span class="font-bold text-gray-800">${member.address || '-'}</span></p>
                 </div>
             </div>
             <div class="bg-brand-900 rounded-xl p-5 border border-brand-800 shadow-xl text-white">
-                 <h4 class="text-xs font-black text-brand-300 mb-4 uppercase tracking-widest flex items-center gap-2">
-                    <i class="fa-solid fa-wallet"></i> Outstanding Dues
-                 </h4>
+                 <div class="flex justify-between items-start mb-4">
+                     <h4 class="text-xs font-black text-brand-300 uppercase tracking-widest flex items-center gap-2">
+                        <i class="fa-solid fa-wallet"></i> Outstanding Dues
+                     </h4>
+                     <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tighter ${dues.isInvalid ? 'bg-red-500 text-white animate-pulse' : dues.isNewMember ? 'bg-blue-500 text-white' : 'bg-green-500 text-white'}">
+                        ${dues.isInvalid ? 'Invalid' : dues.isNewMember ? 'New Member' : 'Active'}
+                     </span>
+                 </div>
                  <div class="space-y-3">
                     <div class="flex justify-between items-center text-xs">
                         <span class="text-brand-300">Entrance:</span>
@@ -206,11 +211,20 @@ window.viewMemberProfile = async (id) => {
                         <span class="text-xl font-black text-white">Rs. ${totalDue.toFixed(2)}</span>
                     </div>
                  </div>
-                 ${totalDue > 0 ? `
+                 ${dues.isInvalid ? `
+                    <div class="grid grid-cols-2 gap-2 mt-4">
+                        <button onclick="window.renewMemberMembership(${member.id}); window.viewMemberProfile(${member.id});" class="bg-red-600 hover:bg-red-700 py-2 rounded-lg text-[10px] font-bold transition-all border border-red-500 shadow-lg">
+                            Renew (13,000)
+                        </button>
+                        <button onclick="window.utils.closeModal(); openTransactionModal('Receipt'); setTimeout(() => { document.getElementById('txPayerInput').value = '${member.memberNo} - ${rawName}'; window.handleTxMemberSelection('${member.memberNo} - ${rawName}'); }, 300)" class="bg-amber-600 hover:bg-amber-700 py-2 rounded-lg text-[10px] font-bold transition-all border border-amber-500 shadow-lg">
+                            Pay Arrears
+                        </button>
+                    </div>
+                 ` : (totalDue > 0 ? `
                     <button onclick="window.utils.closeModal(); openTransactionModal('Receipt'); setTimeout(() => { document.getElementById('txPayerInput').value = '${member.memberNo} - ${rawName}'; window.handleTxMemberSelection('${member.memberNo} - ${rawName}'); }, 300)" class="w-full mt-4 bg-white/10 hover:bg-white/20 py-2 rounded-lg text-xs font-bold transition-all border border-white/10">
                         Collect Payment Now
                     </button>
-                 ` : ''}
+                 ` : '')}
             </div>
         </div>
 
@@ -230,10 +244,10 @@ window.viewMemberProfile = async (id) => {
             ${txHtml}
         </div>
 
-        <div class="pt-4 flex justify-end gap-3 mt-4 border-t border-gray-100">
-            <button type="button" onclick="window.utils.closeModal()" class="px-5 py-2.5 rounded-lg text-gray-600 font-medium hover:bg-gray-100 transition-colors border border-gray-200">Close</button>
-            <button type="button" onclick="window.editMember(${member.id})" class="bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-brand-500/30">
-                <i class="fa-solid fa-pen mr-2"></i> Edit Member Details
+        <div class="pt-6 flex flex-wrap justify-end gap-3 mt-6 border-t border-gray-100 sticky bottom-0 bg-white/95 backdrop-blur-md pb-2">
+            <button type="button" onclick="window.utils.closeModal()" class="flex-1 md:flex-none px-6 py-2.5 rounded-xl text-gray-600 font-bold hover:bg-gray-100 transition-colors border border-gray-200 text-xs uppercase tracking-widest">Close</button>
+            <button type="button" onclick="window.editMember(${member.id})" class="flex-1 md:flex-none bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-brand-500/30 text-xs uppercase tracking-widest">
+                <i class="fa-solid fa-pen mr-2"></i> Edit Details
             </button>
         </div>
     `;
@@ -330,42 +344,42 @@ window.openMemberModal = async (id = null) => {
             
             <!-- Basic Information -->
             <div>
-                <h4 class="text-lg font-semibold text-brand-600 mb-3 border-b pb-2">Basic Details</h4>
-                <div class="grid grid-cols-2 gap-4 mb-4">
+                <h4 class="text-sm font-black text-brand-600 mb-4 border-b pb-2 uppercase tracking-widest">Basic Details</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Member Number <span class="text-red-500">*</span></label>
+                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">Member Number <span class="text-red-500">*</span></label>
                         <input type="text" id="mNo" required value="${member.memberNo}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Joined Date <span class="text-red-500">*</span></label>
+                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">Joined Date <span class="text-red-500">*</span></label>
                         <input type="date" id="mJoined" required value="${member.joinedDate}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
                     </div>
                 </div>
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Full Name <span class="text-red-500">*</span></label>
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">Full Name <span class="text-red-500">*</span></label>
                     <input type="text" id="mName" required value="${member.name}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
                 </div>
-                <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">NIC <span class="text-red-500">*</span></label>
+                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">NIC <span class="text-red-500">*</span></label>
                         <input type="text" id="mNic" required value="${member.nic}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">Date of Birth</label>
                         <input type="date" id="mDob" value="${member.dob}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
                     </div>
                 </div>
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Permanent Address</label>
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">Permanent Address</label>
                     <textarea id="mAddress" rows="2" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all resize-none">${member.address}</textarea>
                 </div>
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">Phone</label>
                         <input type="text" id="mPhone" value="${member.phone}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Marital Status</label>
+                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">Marital Status</label>
                         <select id="mMarital" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all bg-white">
                             <option value="Married" ${member.maritalStatus === 'Married' ? 'selected' : ''}>Married (විවාහක)</option>
                             <option value="Single" ${member.maritalStatus === 'Single' ? 'selected' : ''}>Single (අවිවාහක)</option>
@@ -395,19 +409,17 @@ window.openMemberModal = async (id = null) => {
 
             <!-- Opening Balances / Initial State -->
             <div>
-                <h4 class="text-lg font-semibold text-amber-600 mb-3 border-b pb-2 flex items-center gap-2">
-                    <i class="fa-solid fa-clock-rotate-left"></i> Opening Balances / Initial State
+                <h4 class="text-sm font-black text-amber-600 mb-4 border-b pb-2 flex items-center gap-2 uppercase tracking-widest">
+                    <i class="fa-solid fa-clock-rotate-left"></i> Opening Balances
                 </h4>
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Initial Entrance Fee Paid (Rs.)</label>
+                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">Entrance Paid (Rs.)</label>
                         <input type="number" id="mOpeningEntrance" value="${member.openingEntrancePaid || 0}" step="0.01" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all placeholder-gray-400">
-                        <p class="text-[10px] text-gray-500 mt-1">Amount paid before system migration (System max is 13,000)</p>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Monthly Payments Done Until</label>
+                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">Paid Until</label>
                         <input type="month" id="mOpeningPaidUntil" value="${member.openingPaidUntil || ''}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all">
-                        <p class="text-[10px] text-gray-500 mt-1">Select the last month the member fully paid for.</p>
                     </div>
                 </div>
             </div>
@@ -426,9 +438,9 @@ window.openMemberModal = async (id = null) => {
                 </div>
             </div>
             
-            <div class="pt-4 flex justify-end gap-3 sticky bottom-0 bg-white/90 backdrop-blur-md pb-2 mt-4 border-t border-gray-100">
-                <button type="button" onclick="window.utils.closeModal()" class="px-5 py-2.5 rounded-lg text-gray-600 font-medium hover:bg-gray-100 transition-colors">Cancel</button>
-                <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-brand-500/30">
+            <div class="pt-6 flex flex-wrap justify-end gap-3 sticky bottom-0 bg-white/95 backdrop-blur-md pb-2 mt-6 border-t border-gray-100">
+                <button type="button" onclick="window.utils.closeModal()" class="flex-1 md:flex-none px-6 py-2.5 rounded-xl text-gray-600 font-bold hover:bg-gray-100 transition-colors text-xs uppercase tracking-widest border border-gray-200">Cancel</button>
+                <button type="submit" class="w-full md:w-auto bg-brand-600 hover:bg-brand-700 text-white px-8 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-brand-500/30 text-xs uppercase tracking-widest">
                     <i class="fa-solid fa-save mr-2"></i> Save Member
                 </button>
             </div>
