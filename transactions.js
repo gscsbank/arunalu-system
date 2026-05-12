@@ -593,7 +593,7 @@ window.printTransaction = async (id) => {
 
     let arrearsHtml = '';
     if (tx.memberId && tx.type === 'Receipt' && (tx.unit || 'Main') === 'Main') {
-        const dues = await window.getMemberDues(tx.memberId);
+        const dues = await window.getMemberDues(tx.memberId, tx.date);
         const totalArrears = dues.entranceDue + dues.monthlyDue + dues.funeralDue + dues.arrearsDue;
         if (totalArrears > 0) {
             arrearsHtml = `
@@ -690,7 +690,7 @@ window.printTransaction = async (id) => {
         // Standard Thermal Layout for Receipts/Transfers - Optimized for 55mm Bluetooth Printers
         let statusTagHtml = '';
         if (tx.memberId && tx.type === 'Receipt') {
-            const dues = await window.getMemberDues(tx.memberId);
+            const dues = await window.getMemberDues(tx.memberId, tx.date);
             if (dues.isInvalid) {
                 statusTagHtml = `<div style="text-align: center; border: 1px solid black; margin: 4px 0; font-size: 10px; font-weight: bold;">INVALID MEMBERSHIP</div>`;
             } else if (dues.isNewMember) {
@@ -791,7 +791,7 @@ window.viewTransaction = async (id) => {
 
     let arrearsSummary = '';
     if (tx.memberId) {
-        const dues = await window.getMemberDues(tx.memberId);
+        const dues = await window.getMemberDues(tx.memberId, tx.date);
         const totalArrears = dues.entranceDue + dues.monthlyDue + dues.funeralDue;
         if (totalArrears > 0) {
             arrearsSummary = `
@@ -1252,7 +1252,7 @@ window.openFuneralModal = async () => {
     const members = await db.members.toArray();
     const memOptions = members.map(m => `<option value="${m.id}">${m.memberNo} - ${m.name}</option>`).join('');
 
-    const funerals = (await db.funerals.toArray()).reverse();
+    const funerals = (await db.funerals.toArray()).sort((a, b) => new Date(b.date) - new Date(a.date));
     const funeralRows = funerals.map(f => {
         const m = members.find(mem => mem.id === f.memberId);
         return `
