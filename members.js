@@ -225,15 +225,15 @@ window.viewMemberProfile = async (id) => {
                     </div>
                  ` : (dues.isInvalid ? `
                     <div class="grid grid-cols-2 gap-2 mt-4">
-                        <button onclick="window.renewMemberMembership(${member.id}); window.viewMemberProfile(${member.id});" class="bg-red-600 hover:bg-red-700 py-2 rounded-lg text-[10px] font-bold transition-all border border-red-500 shadow-lg">
+                        <button onclick="window.renewMemberMembership(${member.id}).then(() => { window.openTransactionModal('Receipt'); setTimeout(() => window.selectMemberInTx(${member.id}), 500); })" class="bg-red-600 hover:bg-red-700 py-2 rounded-lg text-[10px] font-bold transition-all border border-red-500 shadow-lg">
                             Renew (13,000)
                         </button>
-                        <button onclick="window.utils.closeModal(); openTransactionModal('Receipt'); setTimeout(() => { document.getElementById('txPayerInput').value = '${member.memberNo} - ${rawName}'; window.handleTxMemberSelection('${member.memberNo} - ${rawName}'); }, 300)" class="bg-amber-600 hover:bg-amber-700 py-2 rounded-lg text-[10px] font-bold transition-all border border-amber-500 shadow-lg">
+                        <button onclick="window.openTransactionModal('Receipt'); setTimeout(() => window.selectMemberInTx(${member.id}), 500)" class="bg-amber-600 hover:bg-amber-700 py-2 rounded-lg text-[10px] font-bold transition-all border border-amber-500 shadow-lg">
                             Pay Arrears
                         </button>
                     </div>
                  ` : (totalDue > 0 ? `
-                    <button onclick="window.utils.closeModal(); openTransactionModal('Receipt'); setTimeout(() => { document.getElementById('txPayerInput').value = '${member.memberNo} - ${rawName}'; window.handleTxMemberSelection('${member.memberNo} - ${rawName}'); }, 300)" class="w-full mt-4 bg-white/10 hover:bg-white/20 py-2 rounded-lg text-xs font-bold transition-all border border-white/10">
+                    <button onclick="window.openTransactionModal('Receipt'); setTimeout(() => window.selectMemberInTx(${member.id}), 500)" class="w-full mt-4 bg-white/10 hover:bg-white/20 py-2 rounded-lg text-xs font-bold transition-all border border-white/10">
                         Collect Payment Now
                     </button>
                  ` : ''))}

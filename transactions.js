@@ -946,6 +946,18 @@ window.submitCancellation = async (e, id) => {
         window.utils.showToast("Error cancelling transaction.", "error");
     }
 };
+window.selectMemberInTx = async (memberId) => {
+    const member = await db.members.get(memberId);
+    if (!member) return;
+    
+    const input = document.getElementById('txPayerInput');
+    if (input) {
+        const val = `${member.memberNo} - ${member.name}`;
+        input.value = val;
+        window.handleTxMemberSelection(val);
+    }
+};
+
 window.handleTxMemberSelection = async (value) => {
     const container = document.getElementById('duesSummaryContainer');
     if (!container || window.currentUnit === 'SAP') {
@@ -1261,6 +1273,7 @@ window.openFuneralModal = async () => {
                 <td class="px-4 py-3 text-sm font-medium text-gray-800">${m ? m.name : 'Unknown'}</td>
                 <td class="px-4 py-3 text-sm text-gray-600">${f.description || '-'}</td>
                 <td class="px-4 py-3 text-right">
+                    <button onclick="window.editFuneral(${f.id})" class="text-brand-500 hover:text-brand-700 transition-colors mr-3"><i class="fa-solid fa-pen-to-square"></i></button>
                     <button onclick="window.deleteFuneral(${f.id})" class="text-red-400 hover:text-red-600 transition-colors"><i class="fa-solid fa-trash"></i></button>
                 </td>
             </tr>
@@ -1275,6 +1288,7 @@ window.openFuneralModal = async () => {
 
         <div id="funeralFormContainer" class="hidden mb-6 bg-gray-50 p-6 rounded-2xl border border-gray-200 animate-fade-in">
             <form onsubmit="window.saveFuneral(event)" class="space-y-4">
+                <input type="hidden" id="fId" value="">
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Event Date</label>
@@ -1294,7 +1308,7 @@ window.openFuneralModal = async () => {
                 </div>
                 <div class="flex justify-end gap-3 text-sm">
                     <button type="button" onclick="window.showAddFuneralForm(false)" class="text-gray-500 font-bold px-4 py-2">Cancel</button>
-                    <button type="submit" class="bg-brand-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-brand-500/30">Save Event Record</button>
+                    <button type="submit" id="fSubmitBtn" class="bg-brand-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-brand-500/30">Save Event Record</button>
                 </div>
             </form>
         </div>
@@ -1321,22 +1335,51 @@ window.openFuneralModal = async () => {
 
 window.showAddFuneralForm = (show = true) => {
     const el = document.getElementById('funeralFormContainer');
-    if (el) el.classList.toggle('hidden', !show);
+    if (!el) return;
+    
+    if (show) {
+        document.getElementById('fId').value = '';
+        document.getElementById('fSubmitBtn').textContent = 'Save Event Record';
+        el.classList.remove('hidden');
+    } else {
+        el.classList.add('hidden');
+    }
+};
+
+window.editFuneral = async (id) => {
+    const f = await db.funerals.get(id);
+    if (!f) return;
+
+    window.showAddFuneralForm(true);
+    document.getElementById('fId').value = f.id;
+    document.getElementById('fDate').value = f.date;
+    document.getElementById('fMember').value = f.memberId;
+    document.getElementById('fDesc').value = f.description || '';
+    document.getElementById('fSubmitBtn').textContent = 'Update Event Record';
 };
 
 window.saveFuneral = async (e) => {
     e.preventDefault();
     try {
+        const id = document.getElementById('fId').value;
         const date = document.getElementById('fDate').value;
         const memberId = parseInt(document.getElementById('fMember').value);
         const description = document.getElementById('fDesc').value;
 
-        await db.funerals.add({ date, memberId, description });
-        window.utils.showToast("Funeral event logged. Billing will be adjusted automatically.");
+        const data = { date, memberId, description };
+
+        if (id) {
+            await db.funerals.update(parseInt(id), data);
+            window.utils.showToast("Funeral event updated.");
+        } else {
+            await db.funerals.add(data);
+            window.utils.showToast("Funeral event logged.");
+        }
+        
         window.openFuneralModal(); // Refresh
     } catch (err) {
         console.error(err);
-        window.utils.showToast("Error recording event", "error");
+        window.utils.showToast("Error saving event", "error");
     }
 };
 

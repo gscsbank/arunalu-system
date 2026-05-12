@@ -168,6 +168,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const sithuminaBal = await getBal('සිතුමිණ තැන්පත්');
 
         const recentTxs = unitTxs.reverse().slice(0, 5);
+        
+        // Calculate totals for recent transactions
+        for (let tx of recentTxs) {
+            const entries = await db.entries.where('transactionId').equals(tx.id).toArray();
+            tx.displayAmount = entries.reduce((acc, curr) => acc + (parseFloat(curr.debit) || 0), 0);
+        }
+
         let recentHtml = '';
         if (recentTxs.length === 0) {
             recentHtml = `
@@ -188,7 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
                     <div class="text-right">
-                        <div class="font-black text-gray-900 text-sm">Rs. ${(tx.totalAmount || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</div>
+                        <div class="font-black text-gray-900 text-sm">Rs. ${(tx.displayAmount || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</div>
                         <div class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter truncate max-w-[120px]">${tx.description || '-'}</div>
                     </div>
                 </div>
