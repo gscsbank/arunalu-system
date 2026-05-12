@@ -20,7 +20,7 @@ async function renderSettings() {
                     <h4 class="font-bold text-gray-800 text-sm">${t.label}</h4>
                     <div class="bg-brand-50 text-brand-600 px-2 py-0.5 rounded font-black">Rs. ${current.amount}</div>
                 </div>
-                <div class="text-[10px] text-gray-400 font-bold mb-4 uppercase">VALID FROM: ${current.effectiveDate}</div>
+                <div class="text-[10px] text-gray-400 font-bold mb-4 uppercase">VALID FROM: ${window.utils.formatDate(current.effectiveDate)}</div>
                 <button onclick="window.openRateChangeModal('${t.key}', '${t.label}')" class="mt-auto w-full bg-gray-50 text-gray-600 hover:bg-brand-50 hover:text-brand-600 py-2 rounded-xl text-xs font-bold transition-all border border-gray-100 uppercase tracking-tighter">Change Rate</button>
             </div>
         `;

@@ -40,6 +40,7 @@ window.utils = {
         requestAnimationFrame(() => {
             container.classList.remove('opacity-0');
             container.classList.add('opacity-100');
+            window.utils.initDateHelper(container);
         });
 
         container.onmousedown = (e) => {
@@ -57,5 +58,79 @@ window.utils = {
             container.classList.add('hidden');
             container.innerHTML = '';
         }, 200);
+    },
+
+    formatDate: (dateStr) => {
+        if (!dateStr) return '-';
+        return dateStr.replace(/-/g, '/');
+    },
+
+    initDateHelper: (container = document) => {
+        const inputs = container.querySelectorAll('input[type="date"]');
+        inputs.forEach(input => {
+            if (input.dataset.helperInit) return;
+            input.dataset.helperInit = "true";
+
+            // Create a visible surrogate text input
+            const surrogate = document.createElement('input');
+            surrogate.type = 'text';
+            surrogate.className = input.className + ' date-surrogate';
+            surrogate.placeholder = 'YYYY/MM/DD';
+            surrogate.style.display = input.style.display;
+            
+            // Initial value sync
+            if (input.value) {
+                surrogate.value = input.value.replace(/-/g, '/');
+            }
+
+            // Hide the original input but keep it for database/logic
+            input.style.display = 'none';
+            input.setAttribute('tabindex', '-1');
+            
+            // Wrapper for positioning icon
+            const wrapper = document.createElement('div');
+            wrapper.className = 'relative flex items-center w-full';
+            input.parentNode.insertBefore(wrapper, input);
+            wrapper.appendChild(surrogate);
+            wrapper.appendChild(input);
+
+            // Add calendar icon
+            const icon = document.createElement('i');
+            icon.className = 'fa-solid fa-calendar-days absolute right-3 text-gray-300 pointer-events-none';
+            wrapper.appendChild(icon);
+
+            // Sync Surrogate -> Original
+            surrogate.addEventListener('input', (e) => {
+                let val = e.target.value.replace(/\D/g, '');
+                let formatted = '';
+                if (val.length > 0) formatted += val.slice(0, 4);
+                if (val.length > 4) formatted += '/' + val.slice(4, 6);
+                if (val.length > 6) formatted += '/' + val.slice(6, 8);
+                e.target.value = formatted;
+
+                if (formatted.length === 10) {
+                    input.value = formatted.replace(/\//g, '-');
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
+
+            // Handle programmatic value changes on the original input
+            const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+            Object.defineProperty(input, 'value', {
+                get: function() { return descriptor.get.call(this); },
+                set: function(val) {
+                    descriptor.set.call(this, val);
+                    surrogate.value = val ? val.replace(/-/g, '/') : '';
+                },
+                configurable: true
+            });
+
+            // Re-sync on blur
+            surrogate.addEventListener('blur', () => {
+                if (input.value) {
+                    surrogate.value = input.value.replace(/-/g, '/');
+                }
+            });
+        });
     }
 };

@@ -145,7 +145,7 @@ window.viewMemberProfile = async (id) => {
             const amt = entryDebits.reduce((acc, curr) => acc + (parseFloat(curr.debit) || 0), 0);
             return `
                                 <tr class="hover:bg-gray-50 transition-colors">
-                                    <td class="px-4 py-3 text-gray-600">${tx.date}</td>
+                                    <td class="px-4 py-3 text-gray-600">${window.utils.formatDate(tx.date)}</td>
                                     <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-xs font-semibold ${tx.type === 'Receipt' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${tx.type}</span></td>
                                     <td class="px-4 py-3 text-gray-800">${tx.reference || '-'}</td>
                                     <td class="px-4 py-3 font-bold text-gray-800 text-right">${amt.toFixed(2)}</td>
@@ -183,7 +183,7 @@ window.viewMemberProfile = async (id) => {
                 <h4 class="text-sm font-black text-brand-600 mb-4 uppercase tracking-widest border-b border-gray-200 pb-2">${member.unit === 'SAP' ? 'Tenant / Shop Info' : 'About Member'}</h4>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
                     <p class="flex flex-col sm:flex-row sm:items-center"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">${member.unit === 'SAP' ? 'ID / No:' : 'Member No:'}</span> <span class="font-bold text-gray-800">${member.memberNo || '-'}</span></p>
-                    <p class="flex flex-col sm:flex-row sm:items-center"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">Joined Date:</span> <span class="font-bold text-gray-800">${member.joinedDate || '-'}</span></p>
+                    <p class="flex flex-col sm:flex-row sm:items-center"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">Joined Date:</span> <span class="font-bold text-gray-800">${window.utils.formatDate(member.joinedDate)}</span></p>
                     <p class="flex flex-col sm:flex-row sm:items-center sm:col-span-2"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">Full Name:</span> <span class="font-bold text-gray-800">${rawName}</span></p>
                     ${member.unit === 'SAP' ? `<p class="flex flex-col sm:flex-row sm:items-center sm:col-span-2"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">Shop Name:</span> <span class="font-bold text-brand-600">${member.shopName || '-'}</span></p>` : ''}
                     <p class="flex flex-col sm:flex-row sm:items-center"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">NIC:</span> <span class="font-bold text-gray-800">${member.nic || '-'}</span></p>
@@ -260,7 +260,7 @@ window.viewMemberProfile = async (id) => {
                                 <div class="text-[10px] bg-brand-50 text-brand-700 px-1.5 py-0.5 rounded font-bold uppercase">${n.relation || 'Nominee'}</div>
                             </div>
                             ${n.address ? `<div class="text-[11px] text-gray-500 mt-1 leading-tight"><i class="fa-solid fa-location-dot mr-1 opacity-50"></i>${n.address}</div>` : ''}
-                            ${n.dob ? `<div class="text-[11px] text-gray-500 mt-0.5"><i class="fa-solid fa-calendar mr-1 opacity-50"></i>DOB: ${n.dob}</div>` : ''}
+                            ${n.dob ? `<div class="text-[11px] text-gray-500 mt-0.5"><i class="fa-solid fa-calendar mr-1 opacity-50"></i>DOB: ${window.utils.formatDate(n.dob)}</div>` : ''}
                         </div>
                     `).join('') : `<p class="text-xs text-gray-400 italic py-4 text-center">No nominees registered</p>`}
                  </div>
@@ -337,6 +337,7 @@ window.addNomineeRow = (nominee = { name: '', relation: '', address: '', dob: ''
         </div>
     `;
     container.appendChild(row);
+    window.utils.initDateHelper(row);
 };
 
 window.openMemberModal = async (id = null) => {

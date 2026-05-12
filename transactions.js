@@ -115,7 +115,7 @@ async function loadTransactionsTable() {
 
         rows.push(`
             <tr class="transition-colors ${statusStyle}">
-                <td class="px-6 py-4 text-sm text-gray-600">${tx.date}</td>
+                <td class="px-6 py-4 text-sm text-gray-600">${window.utils.formatDate(tx.date)}</td>
                 <td class="px-6 py-4 text-sm">
                     <span class="px-2.5 py-1 rounded-full text-xs font-semibold ${tx.type === 'Receipt' ? 'bg-green-100 text-green-700' : tx.type === 'Payment' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}">
                         ${tx.type}
@@ -637,7 +637,7 @@ window.printTransaction = async (id) => {
                     </div>
                     <div style="text-align: right;">
                         <span style="color: #666; text-transform: uppercase; font-size: 10px; font-weight: 800; display: block; margin-bottom: 2px;">Date:</span>
-                        <span style="font-size: 16px; font-weight: 700;">${tx.date}</span>
+                        <span style="font-size: 16px; font-weight: 700;">${window.utils.formatDate(tx.date)}</span>
                     </div>
                 </div>
 
@@ -712,7 +712,7 @@ window.printTransaction = async (id) => {
 
                 <div style="display: flex; justify-content: space-between; margin-bottom: 1px;">
                     <span>Date:</span>
-                    <span style="font-weight: 900;">${tx.date}</span>
+                    <span style="font-weight: 900;">${window.utils.formatDate(tx.date)}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
                     <span>Ref:</span>
@@ -846,7 +846,7 @@ window.viewTransaction = async (id) => {
         <div class="grid grid-cols-2 gap-4 mb-6 text-sm">
             <div class="bg-gray-50 border border-gray-100 rounded-xl p-4">
                 <span class="block text-gray-500 mb-1">Date Logged</span>
-                <span class="font-semibold text-gray-800">${tx.date}</span>
+                <span class="font-semibold text-gray-800">${window.utils.formatDate(tx.date)}</span>
             </div>
             <div class="bg-gray-50 border border-gray-100 rounded-xl p-4">
                 <span class="block text-gray-500 mb-1">Transaction Type</span>
@@ -1257,7 +1257,7 @@ window.openFuneralModal = async () => {
         const m = members.find(mem => mem.id === f.memberId);
         return `
             <tr class="border-b border-gray-100 hover:bg-gray-50">
-                <td class="px-4 py-3 text-sm text-gray-600">${f.date}</td>
+                <td class="px-4 py-3 text-sm text-gray-600">${window.utils.formatDate(f.date)}</td>
                 <td class="px-4 py-3 text-sm font-medium text-gray-800">${m ? m.name : 'Unknown'}</td>
                 <td class="px-4 py-3 text-sm text-gray-600">${f.description || '-'}</td>
                 <td class="px-4 py-3 text-right">

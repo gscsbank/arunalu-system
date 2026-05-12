@@ -118,9 +118,9 @@ window.generateReport = async () => {
 
 
 
-    let dateSubtitle = "දිනය: " + date;
+    let dateSubtitle = "දිනය: " + window.utils.formatDate(date);
     if (['pnl', 'receipt_payment', 'gl_transactions', 'receipt_book'].includes(type) && startDate) {
-        dateSubtitle = "කාල සීමාව: " + startDate + " සිට " + date + " දක්වා";
+        dateSubtitle = "කාල සීමාව: " + window.utils.formatDate(startDate) + " සිට " + window.utils.formatDate(date) + " දක්වා";
     }
 
     const headerHtml = `
@@ -599,7 +599,7 @@ window.generateReport = async () => {
             
             return eT.map((e, index) => `
                 <tr class="text-sm border-b border-gray-200">
-                    <td class="py-2 px-2 text-xs font-bold text-gray-900">${index === 0 ? tx.date : ''}</td>
+                    <td class="py-2 px-2 text-xs font-bold text-gray-900">${index === 0 ? window.utils.formatDate(tx.date) : ''}</td>
                     <td class="py-2 px-2 text-xs text-gray-500">${index === 0 ? (tx.reference || '-') : ''}</td>
                     <td class="py-2 px-2 text-sm text-gray-800">${index === 0 ? `<strong>${tx.type === 'Receipt' ? 'ලැබීම්' : tx.type === 'Payment' ? 'ගෙවීම්' : 'මාරු කිරීම්'}</strong> - ${tx.description || ''}${memberInfo}${badge}` : ''}</td>
                     <td class="py-2 px-4 text-sm text-gray-700 italic border-l border-gray-100">${accounts.find(a => a.id === e.accountId)?.accountName || '-'}</td>
@@ -715,7 +715,7 @@ window.generateReport = async () => {
             
             rowsHtml += `
                 <tr class="border-b border-gray-200 align-top ${isCan ? 'bg-red-50/30' : ''}">
-                    <td class="py-3 px-2 text-[10px] font-bold">${tx.date}</td>
+                    <td class="py-3 px-2 text-[10px] font-bold">${window.utils.formatDate(tx.date)}</td>
                     <td class="py-3 px-2 text-[11px] font-black ${isCan ? 'text-red-600' : 'text-brand-700'}">${tx.reference || '-'}${canBadge}</td>
                     <td class="py-3 px-2 text-[10px] font-bold">${memberName}</td>
                     <td class="py-3 px-2">${breakdown}</td>
@@ -781,7 +781,7 @@ window.generateReport = async () => {
 
             return `
                 <tr class="border-b border-gray-200">
-                    <td class="py-2 px-2 text-xs">${tx.date}</td>
+                    <td class="py-2 px-2 text-xs">${window.utils.formatDate(tx.date)}</td>
                     <td class="py-2 px-2 text-xs">${tx.reference || '-'}</td>
                     <td class="py-2 px-2 text-sm">${tx.description || '-'}</td>
                     <td class="py-2 px-2 text-sm text-right text-gray-600">${deb > 0 ? formatCurrency(deb) : '-'}</td>

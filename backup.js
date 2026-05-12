@@ -106,7 +106,7 @@ window.backupModule = {
                     await navigator.share({
                         files: [file],
                         title: 'Arunalu System Backup',
-                        text: `Arunalu System Daily Backup - ${dateStr}`
+                        text: `Arunalu System Daily Backup - ${window.utils.formatDate(dateStr)}`
                     });
                     window.utils.showToast("Backup shared successfully!");
                 } catch (err) {

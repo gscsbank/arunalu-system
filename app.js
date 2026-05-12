@@ -119,6 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const addedElement = contentArea.querySelector('.fade-enter');
             if (addedElement) {
                 mounters[view]();
+                window.utils.initDateHelper(addedElement);
                 addedElement.classList.add('fade-enter-active');
                 setTimeout(() => {
                     addedElement.classList.remove('fade-enter', 'fade-enter-active');
@@ -183,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <div>
                             <div class="font-bold text-gray-900 text-sm tracking-tight">${tx.reference || 'N/A'} <span class="text-[10px] text-gray-400 ml-1 font-normal uppercase tracking-widest">${tx.type}</span></div>
-                            <div class="text-[11px] text-gray-500 font-bold mt-0.5">${tx.date}</div>
+                            <div class="text-[11px] text-gray-500 font-bold mt-0.5">${window.utils.formatDate(tx.date)}</div>
                         </div>
                     </div>
                     <div class="text-right">
@@ -363,7 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                             <div>
                                 <div class="font-semibold text-gray-900 text-sm">${t.type} • ${t.reference}</div>
-                                <div class="text-[10px] text-gray-500 font-medium">${t.date}</div>
+                                <div class="text-[10px] text-gray-500 font-medium">${window.utils.formatDate(t.date)}</div>
                             </div>
                         </div>
                     `).join('');
