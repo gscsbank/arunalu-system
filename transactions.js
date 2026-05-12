@@ -234,7 +234,7 @@ window.openTransactionModal = async (type) => {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Date <span class="text-red-500">*</span></label>
-                    <input type="date" id="txDate" required value="${new Date().toISOString().split('T')[0]}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
+                    <input type="date" id="txDate" required onchange="const input = document.getElementById('txPayerInput'); if(input && input.value) window.handleTxMemberSelection(input.value)" value="${new Date().toISOString().split('T')[0]}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Reference No</label>
@@ -937,7 +937,7 @@ window.handleTxMemberSelection = async (value) => {
         return;
     }
 
-    const dues = await window.getMemberDues(matched.id);
+    const txDate = document.getElementById('txDate')?.value; const dues = await window.getMemberDues(matched.id, txDate);
     const totalDue = dues.entranceDue + dues.monthlyDue + dues.funeralDue + dues.arrearsDue;
 
     let warningHtml = '';
@@ -1026,7 +1026,7 @@ window.renewMemberMembership = async (memberId) => {
     }
 };
 
-window.getMemberDues = async (memberId) => {
+window.getMemberDues = async (memberId, asOfDate = null) => {
     const member = await db.members.get(memberId);
     if (!member) return { entranceDue: 0, monthlyDue: 0, funeralDue: 0, funeralCount: 0, isInvalid: false, isNewMember: false, monthsBehind: 0 };
 
@@ -1065,7 +1065,7 @@ window.getMemberDues = async (memberId) => {
             referenceDate = new Date(lastPaidStr + "-01");
         }
 
-        const now = new Date();
+        const now = asOfDate ? new Date(asOfDate) : new Date();
         monthsBehind = (now.getFullYear() - referenceDate.getFullYear()) * 12 + (now.getMonth() - referenceDate.getMonth());
 
         if (monthsBehind > 0) {
@@ -1095,9 +1095,25 @@ window.getMemberDues = async (memberId) => {
         gracePeriodEnd.setMonth(gracePeriodEnd.getMonth() + 6);
 
         const allFunerals = await db.funerals.toArray();
+        const calculationDate = asOfDate ? new Date(asOfDate) : new Date();
+        
+        // Paid Until filtering: If paid until YYYY-MM, funerals in that month and before are paid
+        let paidUntilDate = null;
+        if (member.openingPaidUntil) {
+            // End of month for openingPaidUntil
+            const [py, pm] = member.openingPaidUntil.split('-').map(Number);
+            paidUntilDate = new Date(py, pm, 0, 23, 59, 59); // Last day of month
+        }
+
         const eligibleFunerals = allFunerals.filter(f => {
             const fDate = new Date(f.date);
-            // Rule: Not for own home, and only funerals after 6 months of joining
+            // Rule 1: Date must be on or before the receipt date (calculation date)
+            if (fDate > calculationDate) return false;
+            
+            // Rule 2: Date must be after the member's "Paid Until" date
+            if (paidUntilDate && fDate <= paidUntilDate) return false;
+
+            // Existing Rule: Not for own home, and only funerals after 6 months of joining
             return f.memberId !== memberId && fDate > gracePeriodEnd;
         });
 
@@ -1149,7 +1165,7 @@ window.getMemberDues = async (memberId) => {
 };
 
 window.autoFillDues = async (memberId) => {
-    const dues = await window.getMemberDues(memberId);
+    const txDate = document.getElementById('txDate')?.value; const dues = await window.getMemberDues(memberId, txDate);
     const container = document.getElementById('txLinesContainer');
     if (!container) return;
 
