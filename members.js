@@ -283,11 +283,13 @@ window.viewMemberProfile = async (id) => {
     // Special injection for a wider profile modal
     const container = document.getElementById('modal-container');
     container.innerHTML = `
-        <div class="glass-panel p-6 rounded-2xl w-full max-w-3xl shadow-2xl relative animate-scale-up">
-            <button onclick="utils.closeModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors">
+        <div class="glass-panel p-4 md:p-6 rounded-2xl w-full max-w-4xl shadow-2xl relative animate-scale-up my-4 md:my-8 flex flex-col max-h-[95vh] overflow-hidden">
+            <button onclick="utils.closeModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-30 bg-white/80 rounded-full w-8 h-8 flex items-center justify-center shadow-sm">
                 <i class="fa-solid fa-xmark text-xl"></i>
             </button>
-            ${html}
+            <div class="flex-1 overflow-y-auto px-1 custom-scrollbar pt-2">
+                ${html}
+            </div>
         </div>
     `;
     container.classList.remove('hidden');
@@ -457,7 +459,7 @@ window.openMemberModal = async (id = null) => {
                     </div>
                     <div>
                         <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter">Paid Until</label>
-                        <input type="month" id="mOpeningPaidUntil" value="${member.openingPaidUntil || ''}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all">
+                        <input type="date" id="mOpeningPaidUntil" value="${member.openingPaidUntil || ''}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all">
                     </div>
                     <div>
                         <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter text-red-600">Arrears Balance (Rs.)</label>

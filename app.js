@@ -197,10 +197,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const stats = isSAP ? [
             { label: 'SAP මුදල් ශේෂය', value: sapCashBal, icon: 'fa-wallet', color: 'blue', sub: 'Project Cash' },
             { label: 'සිතුමිණ තැන්පතු', value: sithuminaBal, icon: 'fa-bank', color: 'emerald', sub: 'Fixed Deposit' },
-            { label: 'සමස්ත ගනුදෙනු', value: unitTxs.length, icon: 'fa-list-check', color: 'amber', sub: 'Total Records' },
+            { label: 'සමස්ත ගනුදෙනු', value: unitTxs.length, icon: 'fa-list-check', color: 'amber', sub: 'Total Records', isCount: true },
             { label: 'පද්ධති තත්ත්වය', value: 'ACTIVE', icon: 'fa-shield-halved', color: 'slate', sub: 'System Secure' }
         ] : [
-            { label: 'මුළු සාමාජිකයින්', value: memberCount, icon: 'fa-users', color: 'blue', sub: 'Active Members' },
+            { label: 'මුළු සාමාජිකයින්', value: memberCount, icon: 'fa-users', color: 'blue', sub: 'Active Members', isCount: true },
             { label: 'සුභසාධක අරමුදල', value: welfareBal, icon: 'fa-hand-holding-heart', color: 'emerald', sub: 'Welfare Fund' },
             { label: 'මරණාධාර අරමුදල', value: funeralBal, icon: 'fa-heart-pulse', color: 'rose', sub: 'Funeral Fund' },
             { label: 'පද්ධති තත්ත්වය', value: 'ONLINE', icon: 'fa-cloud', color: 'slate', sub: 'V2.1 Enterprise' }
@@ -214,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
                      </div>
                      <div>
                         <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest block">${s.label}</span>
-                        <div class="text-2xl font-black text-gray-900 tracking-tighter">${typeof s.value === 'number' ? 'Rs. ' + s.value.toLocaleString(undefined, {maximumFractionDigits:0}) : s.value}</div>
+                        <div class="text-2xl font-black text-gray-900 tracking-tighter">${typeof s.value === 'number' ? (s.isCount ? '' : 'Rs. ') + s.value.toLocaleString(undefined, {maximumFractionDigits:0}) : s.value}</div>
                         <span class="text-[10px] font-bold text-${s.color}-600/70 uppercase tracking-tighter">${s.sub}</span>
                      </div>
                 </div>

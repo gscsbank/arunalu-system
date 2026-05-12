@@ -1062,7 +1062,7 @@ window.getMemberDues = async (memberId, asOfDate = null) => {
         let referenceDate = new Date(joinDateStr);
 
         if (lastPaidStr) {
-            referenceDate = new Date(lastPaidStr + "-01");
+            referenceDate = new Date(lastPaidStr + (lastPaidStr.length === 7 ? "-01" : ""));
         }
 
         const now = asOfDate ? new Date(asOfDate) : new Date();
@@ -1100,9 +1100,15 @@ window.getMemberDues = async (memberId, asOfDate = null) => {
         // Paid Until filtering: If paid until YYYY-MM, funerals in that month and before are paid
         let paidUntilDate = null;
         if (member.openingPaidUntil) {
-            // End of month for openingPaidUntil
-            const [py, pm] = member.openingPaidUntil.split('-').map(Number);
-            paidUntilDate = new Date(py, pm, 0, 23, 59, 59); // Last day of month
+            if (member.openingPaidUntil.length === 7) {
+                // Legacy month format
+                const [py, pm] = member.openingPaidUntil.split('-').map(Number);
+                paidUntilDate = new Date(py, pm, 0, 23, 59, 59);
+            } else {
+                // New date format
+                paidUntilDate = new Date(member.openingPaidUntil);
+                paidUntilDate.setHours(23, 59, 59, 999);
+            }
         }
 
         const eligibleFunerals = allFunerals.filter(f => {
