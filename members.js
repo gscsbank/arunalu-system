@@ -242,11 +242,27 @@ window.viewMemberProfile = async (id) => {
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 ${member.unit === 'SAP' ? 'hidden' : ''}">
             <div class="bg-gray-50 rounded-xl p-5 border border-gray-100 shadow-sm">
-                 <h4 class="text-sm font-semibold text-brand-600 mb-3 uppercase tracking-wide border-b border-gray-200 pb-2">Family & Nominees</h4>
+                 <h4 class="text-sm font-semibold text-brand-600 mb-3 uppercase tracking-wide border-b border-gray-200 pb-2">Family & General Info</h4>
                  <div class="space-y-2.5 text-sm">
                     <p class="flex items-start"><span class="text-gray-500 w-28 shrink-0">Marital Status:</span> <span class="font-medium text-gray-800">${member.maritalStatus || 'Married'}</span></p>
-                    <p class="flex items-start"><span class="text-gray-500 w-28 shrink-0">Nominees:</span> <span class="font-medium text-gray-800 bg-brand-100 text-brand-700 px-2 py-0.5 rounded text-xs">${(member.nominees || []).length} Saved</span></p>
-                    <p class="flex items-start"><span class="text-gray-500 w-28 shrink-0">Death Ben.:</span> <span class="font-medium text-gray-800">${member.benName || '-'}</span></p>
+                    <p class="flex items-start"><span class="text-gray-500 w-28 shrink-0">Death Ben.:</span> <span class="font-medium text-gray-800 font-bold">${member.benName || '-'}</span></p>
+                    ${member.benAddress ? `<p class="flex items-start"><span class="text-gray-500 w-28 shrink-0">Ben. Address:</span> <span class="text-gray-600 text-xs italic">${member.benAddress}</span></p>` : ''}
+                    ${member.benPhone ? `<p class="flex items-start"><span class="text-gray-500 w-28 shrink-0">Ben. Phone:</span> <span class="text-gray-800 font-medium">${member.benPhone}</span></p>` : ''}
+                 </div>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-5 border border-gray-100 shadow-sm">
+                 <h4 class="text-sm font-semibold text-brand-600 mb-3 uppercase tracking-wide border-b border-gray-200 pb-2">Nominees (${(member.nominees || []).length})</h4>
+                 <div class="space-y-3">
+                    ${(member.nominees || []).length > 0 ? (member.nominees || []).map(n => `
+                        <div class="p-3 bg-white rounded-lg border border-gray-100 shadow-sm">
+                            <div class="flex justify-between items-start">
+                                <div class="font-bold text-gray-800">${n.name || 'Unnamed'}</div>
+                                <div class="text-[10px] bg-brand-50 text-brand-700 px-1.5 py-0.5 rounded font-bold uppercase">${n.relation || 'Nominee'}</div>
+                            </div>
+                            ${n.address ? `<div class="text-[11px] text-gray-500 mt-1 leading-tight"><i class="fa-solid fa-location-dot mr-1 opacity-50"></i>${n.address}</div>` : ''}
+                            ${n.dob ? `<div class="text-[11px] text-gray-500 mt-0.5"><i class="fa-solid fa-calendar mr-1 opacity-50"></i>DOB: ${n.dob}</div>` : ''}
+                        </div>
+                    `).join('') : `<p class="text-xs text-gray-400 italic py-4 text-center">No nominees registered</p>`}
                  </div>
             </div>
         </div>
@@ -448,6 +464,10 @@ window.openMemberModal = async (id = null) => {
                         <input type="number" id="mOpeningArrears" value="${member.openingArrears || 0}" step="0.01" class="w-full px-4 py-2.5 rounded-xl border border-red-200 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 outline-none transition-all font-bold text-red-700 bg-red-50/30">
                     </div>
                 </div>
+                <div class="mt-4">
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-tighter text-green-600">Advance Monthly Fees (මුල් ගෙවීම් - රු.)</label>
+                    <input type="number" id="mOpeningAdvMonthly" value="${(member.openingAdvMonthly || 0) || ((member.openingAdvMembership || 0) + (member.openingAdvContribution || 0))}" step="0.01" class="w-full px-4 py-2.5 rounded-xl border border-green-200 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 outline-none transition-all font-bold text-green-700 bg-green-50/30">
+                </div>
             </div>
 
             <!-- Nominee Details -->
@@ -522,6 +542,7 @@ window.saveMember = async (e, id) => {
             openingEntrancePaid: parseFloat(document.getElementById('mOpeningEntrance')?.value) || 0,
             openingPaidUntil: document.getElementById('mOpeningPaidUntil')?.value || '',
             openingArrears: parseFloat(document.getElementById('mOpeningArrears')?.value) || 0,
+            openingAdvMonthly: parseFloat(document.getElementById('mOpeningAdvMonthly')?.value) || 0,
             nominees: nomineesList,
             unit: window.currentUnit,
             shopName: document.getElementById('mShop')?.value || ''

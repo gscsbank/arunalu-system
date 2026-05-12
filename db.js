@@ -34,8 +34,7 @@ async function initDefaultAccounts() {
         { accountName: 'SAP මුදල් පොත', accountType: 'Asset', category: 'Current Asset', unit: 'SAP' },
         { accountName: 'සිතුමිණ තැන්පත් ගිණුම', accountType: 'Asset', category: 'Current Asset', unit: 'SAP' },
         { accountName: 'ඇතුලත්වීමේ ගාස්තු ලැබීම්', accountType: 'Income', category: 'Revenue', unit: 'Main' },
-        { accountName: 'දායක අරමුදල් ලැබීම්', accountType: 'Income', category: 'Revenue', oldName: 'Monthly Contribution (Rs. 100)' },
-        { accountName: 'සාමාජික අරමුදල් ලැබීම්', accountType: 'Income', category: 'Revenue', oldName: 'Monthly Membership (Rs. 200)' },
+        { accountName: 'මාසික සාමාජික මුදල් ලැබීම්', accountType: 'Income', category: 'Revenue', unit: 'Main' },
         { accountName: 'සුභ සාධක අරමුදල් ලැබීම්', accountType: 'Income', category: 'Revenue', oldName: 'Funeral Contribution (Rs. 200)' },
         { accountName: 'හිඟ මුදල් ලැබීම්', accountType: 'Income', category: 'Revenue', unit: 'Main' }
     ];
@@ -60,7 +59,7 @@ async function initDefaultAccounts() {
     }
     
     // Cleanup: Remove unwanted accounts if they exist and have no transactions
-    const unwanted = ['හිඟ මුදල් පියවීම්', 'Monthly Subscription', 'Meeting Expenses', 'Welfare Payments'];
+    const unwanted = ['හිඟ මුදල් පියවීම්', 'Monthly Subscription', 'Meeting Expenses', 'Welfare Payments', 'දායක අරමුදල් ලැබීම්', 'සාමාජික අරමුදල් ලැබීම්', 'මාසික දායකත්ව ලැබීම් (Rs. 300)'];
     for (const name of unwanted) {
         const acc = await db.accounts.where('accountName').equalsIgnoreCase(name).first();
         if (acc) {

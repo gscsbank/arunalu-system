@@ -1032,8 +1032,9 @@ window.getMemberDues = async (memberId) => {
 
     const accounts = await db.accounts.toArray();
     const entranceAcc = accounts.find(a => a.accountName === 'ඇතුලත්වීමේ ගාස්තු ලැබීම්' || a.accountName.includes('Entrance Fee'));
-    const monthly100Acc = accounts.find(a => a.accountName === 'දායක අරමුදල් ලැබීම්' || a.accountName.includes('Monthly Contribution (Rs. 100)'));
-    const monthly200Acc = accounts.find(a => a.accountName === 'සාමාජික අරමුදල් ලැබීම්' || a.accountName.includes('Monthly Membership (Rs. 200)'));
+    const monthly100Acc = accounts.find(a => a.accountName === 'දායක අරමුදල් ලැබීම්' || a.accountName.includes('(Rs. 100)'));
+    const monthly200Acc = accounts.find(a => a.accountName === 'සාමාජික අරමුදල් ලැබීම්' || a.accountName.includes('(Rs. 200)'));
+    const monthlyUnifiedAcc = accounts.find(a => a.accountName === 'මාසික සාමාජික මුදල් ලැබීම්');
     const funeralAcc = accounts.find(a => a.accountName === 'සුභ සාධක අරමුදල් ලැබීම්' || a.accountName.includes('Funeral Contribution (Rs. 200)'));
 
     const joinDateStr = member.joinedDate || '';
@@ -1070,8 +1071,8 @@ window.getMemberDues = async (memberId) => {
         if (monthsBehind > 0) {
             const totalMonthlyExpected = monthsBehind * 300;
             let monthlyPaid = 0;
-            if (monthly100Acc || monthly200Acc) {
-                const mEntries = await db.entries.where('accountId').anyOf([monthly100Acc?.id, monthly200Acc?.id].filter(id => id)).toArray();
+            if (monthly100Acc || monthly200Acc || monthlyUnifiedAcc) {
+                const mEntries = await db.entries.where('accountId').anyOf([monthly100Acc?.id, monthly200Acc?.id, monthlyUnifiedAcc?.id].filter(id => id)).toArray();
                 for (let e of mEntries) {
                     const tx = await db.transactions.get(e.transactionId);
                     // Rule: Only count payments made after or on the current joinDate
@@ -1080,7 +1081,7 @@ window.getMemberDues = async (memberId) => {
                     }
                 }
             }
-            monthlyDue = Math.max(0, totalMonthlyExpected - monthlyPaid);
+            monthlyDue = Math.max(0, totalMonthlyExpected - monthlyPaid - (member.openingAdvMonthly || 0) - (member.openingAdvMembership || 0) - (member.openingAdvContribution || 0));
             // Re-calculate actual months behind based on remaining balance
             monthsBehind = Math.floor(monthlyDue / 300);
         }
@@ -1156,19 +1157,16 @@ window.autoFillDues = async (memberId) => {
 
     const accounts = await db.accounts.toArray();
     const entranceAcc = accounts.find(a => a.accountName === 'ඇතුලත්වීමේ ගාස්තු ලැබීම්' || a.accountName.includes('Entrance Fee'));
-    const monthly100Acc = accounts.find(a => a.accountName === 'දායක අරමුදල් ලැබීම්' || a.accountName.includes('Monthly Contribution (Rs. 100)'));
-    const monthly200Acc = accounts.find(a => a.accountName === 'සාමාජික අරමුදල් ලැබීම්' || a.accountName.includes('Monthly Membership (Rs. 200)'));
+    const monthly100Acc = accounts.find(a => a.accountName === 'දායක අරමුදල් ලැබීම්' || a.accountName.includes('(Rs. 100)'));
+    const monthly200Acc = accounts.find(a => a.accountName === 'සාමාජික අරමුදල් ලැබීම්' || a.accountName.includes('(Rs. 200)'));
+    const monthlyUnifiedAcc = accounts.find(a => a.accountName === 'මාසික සාමාජික මුදල් ලැබීම්');
     const funeralAcc = accounts.find(a => a.accountName === 'සුභ සාධක අරමුදල් ලැබීම්' || a.accountName.includes('Funeral Contribution (Rs. 200)'));
 
     if (dues.entranceDue > 0 && entranceAcc) {
         window.addTxLineWithAmount(entranceAcc.id, dues.entranceDue);
     }
-    if (dues.monthlyDue > 0) {
-        // Split monthly due into 100 (Contribution) and 200 (Membership) proportionally if possible
-        // For simplicity, if they owe 300, we do 100/200.
-        const monthsOwed = Math.ceil(dues.monthlyDue / 300);
-        if (monthly100Acc) window.addTxLineWithAmount(monthly100Acc.id, monthsOwed * 100);
-        if (monthly200Acc) window.addTxLineWithAmount(monthly200Acc.id, monthsOwed * 200);
+    if (dues.monthlyDue > 0 && monthlyUnifiedAcc) {
+        window.addTxLineWithAmount(monthlyUnifiedAcc.id, dues.monthlyDue);
     }
     if (dues.funeralDue > 0 && funeralAcc) {
         window.addTxLineWithAmount(funeralAcc.id, dues.funeralDue);
