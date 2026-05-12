@@ -156,7 +156,6 @@ window.generateReport = async () => {
 
     // Standard unit filtering for transactions
     const validTxsEnd = allTxsEnd.filter(t => {
-        if (t.status === 'Cancelled') return false;
         const txUnit = t.unit || 'Main';
         if (!isMainUnit) return txUnit === 'SAP';
         return txUnit === 'Main';
@@ -711,13 +710,16 @@ window.generateReport = async () => {
                 </div>`;
             }).join('');
 
+            const isCan = tx.status === 'Cancelled';
+            const canBadge = isCan ? `<br><span class="text-[9px] text-red-600 font-bold italic">CANCELLED: ${tx.cancelReason || '-'}</span>` : '';
+            
             rowsHtml += `
-                <tr class="border-b border-gray-200 align-top">
+                <tr class="border-b border-gray-200 align-top ${isCan ? 'bg-red-50/30' : ''}">
                     <td class="py-3 px-2 text-[10px] font-bold">${tx.date}</td>
-                    <td class="py-3 px-2 text-[11px] font-black text-brand-700">${tx.reference || '-'}</td>
+                    <td class="py-3 px-2 text-[11px] font-black ${isCan ? 'text-red-600' : 'text-brand-700'}">${tx.reference || '-'}${canBadge}</td>
                     <td class="py-3 px-2 text-[10px] font-bold">${memberName}</td>
                     <td class="py-3 px-2">${breakdown}</td>
-                    <td class="py-3 px-2 text-right font-black text-[11px]">${formatCurrency(totalAmount)}</td>
+                    <td class="py-3 px-2 text-right font-black text-[11px] ${isCan ? 'text-red-400' : ''}">${formatCurrency(totalAmount)}</td>
                 </tr>
             `;
         }
