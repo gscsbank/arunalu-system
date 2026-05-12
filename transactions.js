@@ -602,6 +602,13 @@ window.printTransaction = async (id) => {
                     <div style="font-size: 11px; font-weight: 900;">Rs. ${totalArrears.toFixed(2)}</div>
                 </div>
             `;
+        } else if (dues.monthlyAdvance > 0) {
+            arrearsHtml = `
+                <div style="border: 1px solid black; padding: 4px; margin-top: 8px; text-align: center; border-style: double;">
+                    <div style="font-size: 9px; font-weight: 800; text-transform: uppercase;">ඉදිරි ගෙවීම් ශේෂය (Advance Balance)</div>
+                    <div style="font-size: 11px; font-weight: 900; color: #15803d;">Rs. ${dues.monthlyAdvance.toFixed(2)}</div>
+                </div>
+            `;
         }
     }
 
@@ -803,6 +810,23 @@ window.viewTransaction = async (id) => {
                     </div>
                 </div>
             `;
+        } else if (dues.monthlyAdvance > 0) {
+            arrearsSummary = `
+                <div class="col-span-2 bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex justify-between items-center mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </div>
+                        <div>
+                            <span class="block text-emerald-800 font-bold text-sm">Advance Balance (ඉදිරි ගෙවීම්)</span>
+                            <span class="text-emerald-600 text-xs">This member has credit in their account.</span>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xl font-black text-emerald-900">Rs. ${dues.monthlyAdvance.toFixed(2)}</span>
+                    </div>
+                </div>
+            `;
         }
     }
 
@@ -989,7 +1013,7 @@ window.handleTxMemberSelection = async (value) => {
                 </div>
                 <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-amber-700">
                     <span>ඇතුලත්වීමේ ගාස්තු ලැබීම්:</span><span class="text-right font-semibold">Rs. ${dues.entranceDue.toFixed(2)}</span>
-                    <span>මාසික ගාස්තු ලැබීම්:</span><span class="text-right font-semibold">Rs. ${dues.monthlyDue.toFixed(2)}</span>
+                    <span>මාසික ගාස්තු ලැබීම්:</span><span class="text-right font-semibold">${dues.monthlyAdvance > 0 ? `<span class="text-green-600">Advance: Rs. ${dues.monthlyAdvance.toFixed(2)}</span>` : `Rs. ${dues.monthlyDue.toFixed(2)}`}</span>
                     <span>සුභ සාධක අරමුදල් ලැබීම් (${dues.funeralCount}):</span><span class="text-right font-semibold">Rs. ${dues.funeralDue.toFixed(2)}</span>
                     ${dues.arrearsDue > 0 ? `<span>පැරණි හිඟ මුදල්:</span><span class="text-right font-semibold text-red-600">Rs. ${dues.arrearsDue.toFixed(2)}</span>` : ''}
                 </div>
@@ -1032,9 +1056,16 @@ window.getMemberDues = async (memberId, asOfDate = null) => {
 
     const accounts = await db.accounts.toArray();
     const entranceAcc = accounts.find(a => a.accountName === 'ඇතුලත්වීමේ ගාස්තු ලැබීම්' || a.accountName.includes('Entrance Fee'));
-    const monthly100Acc = accounts.find(a => a.accountName === 'දායක අරමුදල් ලැබීම්' || a.accountName.includes('(Rs. 100)'));
-    const monthly200Acc = accounts.find(a => a.accountName === 'සාමාජික අරමුදල් ලැබීම්' || a.accountName.includes('(Rs. 200)'));
-    const monthlyUnifiedAcc = accounts.find(a => a.accountName === 'මාසික සාමාජික මුදල් ලැබීම්');
+    const monthlyAccs = accounts.filter(a => 
+        a.accountName.includes('මාසික සාමාජික') || 
+        a.accountName.includes('මාසික දායකත්ව') || 
+        a.accountName.includes('දායක අරමුදල්') || 
+        a.accountName.includes('සාමාජික අරමුදල්') ||
+        a.accountName.includes('Monthly Contribution') || 
+        a.accountName.includes('Monthly Membership')
+    );
+    const monthlyAccIds = monthlyAccs.map(a => a.id);
+    const monthlyUnifiedAcc = monthlyAccs.find(a => a.accountName === 'මාසික සාමාජික මුදල් ලැබීම්' || a.accountName.includes('(Rs. 300)'));
     const funeralAcc = accounts.find(a => a.accountName === 'සුභ සාධක අරමුදල් ලැබීම්' || a.accountName.includes('Funeral Contribution (Rs. 200)'));
 
     const joinDateStr = member.joinedDate || '';
@@ -1056,7 +1087,7 @@ window.getMemberDues = async (memberId, asOfDate = null) => {
 
     // 2. Monthly Dues (Rs. 300 total)
     let monthlyDue = 0;
-    let monthsBehind = 0;
+    let monthsBehind = 0; let monthlyAdvance = 0;
     if (joinDateStr !== '') {
         const lastPaidStr = member.openingPaidUntil; 
         let referenceDate = new Date(joinDateStr);
@@ -1068,23 +1099,23 @@ window.getMemberDues = async (memberId, asOfDate = null) => {
         const now = asOfDate ? new Date(asOfDate) : new Date();
         monthsBehind = (now.getFullYear() - referenceDate.getFullYear()) * 12 + (now.getMonth() - referenceDate.getMonth());
 
-        if (monthsBehind > 0) {
-            const totalMonthlyExpected = monthsBehind * 300;
-            let monthlyPaid = 0;
-            if (monthly100Acc || monthly200Acc || monthlyUnifiedAcc) {
-                const mEntries = await db.entries.where('accountId').anyOf([monthly100Acc?.id, monthly200Acc?.id, monthlyUnifiedAcc?.id].filter(id => id)).toArray();
-                for (let e of mEntries) {
-                    const tx = await db.transactions.get(e.transactionId);
-                    // Rule: Only count payments made after or on the current joinDate
-                    if (tx && tx.memberId === memberId && tx.status !== 'Cancelled' && tx.date >= joinDateStr) {
-                        monthlyPaid += (parseFloat(e.credit) || 0);
-                    }
+        const totalMonthlyExpected = monthsBehind * 300;
+        let monthlyPaid = 0;
+        if (monthlyAccIds.length > 0) {
+            const mEntries = await db.entries.where('accountId').anyOf(monthlyAccIds).toArray();
+            for (let e of mEntries) {
+                const tx = await db.transactions.get(e.transactionId);
+                // Rule: Only count payments made after or on the current joinDate
+                if (tx && tx.memberId === memberId && tx.status !== 'Cancelled' && tx.date >= joinDateStr) {
+                    monthlyPaid += (parseFloat(e.credit) || 0);
                 }
             }
-            monthlyDue = Math.max(0, totalMonthlyExpected - monthlyPaid - (member.openingAdvMonthly || 0) - (member.openingAdvMembership || 0) - (member.openingAdvContribution || 0));
-            // Re-calculate actual months behind based on remaining balance
-            monthsBehind = Math.floor(monthlyDue / 300);
         }
+        const monthlyBal = totalMonthlyExpected - monthlyPaid - (member.openingAdvMonthly || 0) - (member.openingAdvMembership || 0) - (member.openingAdvContribution || 0);
+        monthlyDue = Math.max(0, monthlyBal);
+        monthlyAdvance = Math.max(0, -monthlyBal);
+        // Re-calculate actual months behind based on remaining balance
+        monthsBehind = Math.floor(monthlyDue / 300);
     }
 
     // 3. Funeral Dues (Rs. 200 each)
@@ -1163,7 +1194,7 @@ window.getMemberDues = async (memberId, asOfDate = null) => {
         monthlyDue, 
         funeralDue, 
         arrearsDue,
-        funeralCount: validFuneralCount,
+        funeralCount: validFuneralCount, monthlyAdvance,
         isInvalid,
         isNewMember,
         monthsBehind
@@ -1179,9 +1210,16 @@ window.autoFillDues = async (memberId) => {
 
     const accounts = await db.accounts.toArray();
     const entranceAcc = accounts.find(a => a.accountName === 'ඇතුලත්වීමේ ගාස්තු ලැබීම්' || a.accountName.includes('Entrance Fee'));
-    const monthly100Acc = accounts.find(a => a.accountName === 'දායක අරමුදල් ලැබීම්' || a.accountName.includes('(Rs. 100)'));
-    const monthly200Acc = accounts.find(a => a.accountName === 'සාමාජික අරමුදල් ලැබීම්' || a.accountName.includes('(Rs. 200)'));
-    const monthlyUnifiedAcc = accounts.find(a => a.accountName === 'මාසික සාමාජික මුදල් ලැබීම්');
+    const monthlyAccs = accounts.filter(a => 
+        a.accountName.includes('මාසික සාමාජික') || 
+        a.accountName.includes('මාසික දායකත්ව') || 
+        a.accountName.includes('දායක අරමුදල්') || 
+        a.accountName.includes('සාමාජික අරමුදල්') ||
+        a.accountName.includes('Monthly Contribution') || 
+        a.accountName.includes('Monthly Membership')
+    );
+    const monthlyAccIds = monthlyAccs.map(a => a.id);
+    const monthlyUnifiedAcc = monthlyAccs.find(a => a.accountName === 'මාසික සාමාජික මුදල් ලැබීම්' || a.accountName.includes('(Rs. 300)'));
     const funeralAcc = accounts.find(a => a.accountName === 'සුභ සාධක අරමුදල් ලැබීම්' || a.accountName.includes('Funeral Contribution (Rs. 200)'));
 
     if (dues.entranceDue > 0 && entranceAcc) {

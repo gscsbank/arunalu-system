@@ -207,7 +207,7 @@ window.viewMemberProfile = async (id) => {
                     </div>
                     <div class="flex justify-between items-center text-xs">
                         <span class="text-brand-300">Monthly:</span>
-                        <span class="font-bold">${dues.monthlyDue.toFixed(2)}</span>
+                        <span class="font-bold">${dues.monthlyAdvance > 0 ? `<span class="text-emerald-400">Adv: ${dues.monthlyAdvance.toFixed(2)}</span>` : dues.monthlyDue.toFixed(2)}</span>
                     </div>
                     <div class="flex justify-between items-center text-xs">
                         <span class="text-brand-300">Funerals:</span>
