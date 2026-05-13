@@ -246,6 +246,7 @@ window.openTransactionModal = async (type) => {
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Payer / Member</label>
                     <input list="membersList" id="txPayerInput" onchange="window.handleTxMemberSelection(this.value)" oninput="window.handleTxMemberSelection(this.value)" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all bg-white" placeholder="Search member..." autocomplete="off">
+                    <input type="hidden" id="txMemberId">
                     <datalist id="membersList">
                         ${memOptions}
                     </datalist>
@@ -344,9 +345,17 @@ window.saveTransaction = async (e, type, printAfter = false) => {
         let memberId = null;
         let otherName = null;
 
-        if (payerInput) {
+        const hiddenMemberId = document.getElementById('txMemberId')?.value;
+        if (hiddenMemberId) {
+            memberId = parseInt(hiddenMemberId);
+        } else if (payerInput) {
             const members = await db.members.toArray();
-            const matchedMember = members.find(m => `${m.memberNo} - ${m.name}` === payerInput || m.memberNo === payerInput || m.name === payerInput);
+            const lowerPayer = payerInput.toLowerCase();
+            const matchedMember = members.find(m => 
+                (`${m.memberNo} - ${m.name}`).toLowerCase() === lowerPayer || 
+                String(m.memberNo).toLowerCase() === lowerPayer || 
+                m.name.toLowerCase() === lowerPayer
+            );
             if (matchedMember) {
                 memberId = matchedMember.id;
             } else {
@@ -966,7 +975,16 @@ window.handleTxMemberSelection = async (value) => {
     }
 
     const members = await db.members.toArray();
-    const matched = members.find(m => `${m.memberNo} - ${m.name}` === value || String(m.memberNo) === String(value) || m.name === value);
+    const lowerVal = value.trim().toLowerCase();
+    const matched = members.find(m => {
+        const mNo = String(m.memberNo || '').trim().toLowerCase();
+        const mName = String(m.name || '').trim().toLowerCase();
+        const combined = `${mNo} - ${mName}`;
+        return combined === lowerVal || mNo === lowerVal || mName === lowerVal;
+    });
+
+    const hiddenIdInput = document.getElementById('txMemberId');
+    if (hiddenIdInput) hiddenIdInput.value = matched ? matched.id : '';
 
     if (!matched) {
         container.classList.add('hidden');

@@ -105,6 +105,14 @@ async function initDefaultAccounts() {
 // Subscribe to readiness
 db.on('ready', async () => {
     await initDefaultAccounts();
+    
+    // Temporary auto-delete for AR000034
+    const tx = await db.transactions.where('reference').equals('AR000034').first();
+    if (tx) {
+        await db.entries.where('transactionId').equals(tx.id).delete();
+        await db.transactions.delete(tx.id);
+        setTimeout(() => alert('AR000034 ගනුදෙනුව සාර්ථකව මකා දැමුණි. කරුණාකර පිටුව නැවත Refresh කරන්න.'), 500);
+    }
 });
 
 db.open().catch(err => {
