@@ -1,7 +1,7 @@
 window.utils = {
     showToast: (message, type = 'success') => {
         const toast = document.createElement('div');
-        toast.className = `fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-3 rounded border shadow-xl transition-all duration-300 translate-y-10 opacity-0 z-[100] flex items-center gap-3 bg-white ${type === 'success' ? 'border-emerald-200' :
+        toast.className = `fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-3 rounded border shadow-xl transition-all duration-300 translate-y-10 opacity-0 z-[100] flex items-center gap-3 bg-white print:hidden ${type === 'success' ? 'border-emerald-200' :
                 type === 'error' ? 'border-red-200' : 'border-blue-200'
             }`;
         toast.innerHTML = `
@@ -58,6 +58,86 @@ window.utils = {
             container.classList.add('hidden');
             container.innerHTML = '';
         }, 200);
+    },
+
+    showConfirm: (title, message, onConfirm, confirmText = 'Confirm', type = 'warning') => {
+        const container = document.getElementById('confirm-container');
+        const modal = document.getElementById('confirm-modal');
+        if (!container || !modal) return;
+
+        modal.innerHTML = `
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 rounded-full ${type === 'warning' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'} flex items-center justify-center mx-auto mb-4 text-2xl">
+                    <i class="fa-solid ${type === 'warning' ? 'fa-circle-question' : 'fa-circle-info'}"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800">${title}</h3>
+                <p class="text-sm text-gray-500 mt-2">${message}</p>
+            </div>
+            <div class="flex justify-center gap-3">
+                <button onclick="window.utils.closeConfirm()" class="px-5 py-2.5 rounded-xl text-gray-600 font-bold hover:bg-gray-100 transition-colors border border-gray-200 text-[10px] uppercase tracking-widest">Cancel</button>
+                <button id="systemConfirmBtn" class="${type === 'warning' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-brand-600 hover:bg-brand-700'} text-white px-6 py-2.5 rounded-xl font-bold transition-colors shadow-lg ${type === 'warning' ? 'shadow-amber-500/30' : 'shadow-brand-500/30'} text-[10px] uppercase tracking-widest">${confirmText}</button>
+            </div>
+        `;
+
+        container.classList.remove('hidden');
+        requestAnimationFrame(() => {
+            container.classList.remove('opacity-0');
+            container.classList.add('opacity-100');
+        });
+
+        document.getElementById('systemConfirmBtn').onclick = () => {
+            window.utils.closeConfirm();
+            onConfirm();
+        };
+    },
+
+    closeConfirm: () => {
+        const container = document.getElementById('confirm-container');
+        if (!container) return;
+        container.classList.remove('opacity-100');
+        container.classList.add('opacity-0');
+        setTimeout(() => container.classList.add('hidden'), 200);
+    },
+
+    showPrompt: (title, message, callback, inputType = 'text', confirmText = 'Submit') => {
+        const container = document.getElementById('confirm-container');
+        const modal = document.getElementById('confirm-modal');
+        if (!container || !modal) return;
+
+        modal.innerHTML = `
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mx-auto mb-4 text-2xl">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800">${title}</h3>
+                <p class="text-sm text-gray-500 mt-2">${message}</p>
+            </div>
+            <div class="mb-6">
+                <input type="${inputType}" id="promptInput" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all shadow-sm text-center font-bold tracking-widest" autofocus placeholder="Enter password...">
+            </div>
+            <div class="flex justify-center gap-3">
+                <button onclick="window.utils.closeConfirm()" class="flex-1 px-5 py-2.5 rounded-xl text-gray-600 font-bold hover:bg-gray-100 transition-colors border border-gray-200 text-[10px] uppercase tracking-widest">Cancel</button>
+                <button id="promptConfirmBtn" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-xl font-bold transition-colors shadow-lg shadow-brand-500/30 text-[10px] uppercase tracking-widest">${confirmText}</button>
+            </div>
+        `;
+
+        container.classList.remove('hidden');
+        requestAnimationFrame(() => {
+            container.classList.remove('opacity-0');
+            container.classList.add('opacity-100');
+            document.getElementById('promptInput').focus();
+        });
+
+        const handleAction = () => {
+            const val = document.getElementById('promptInput').value;
+            window.utils.closeConfirm();
+            callback(val);
+        };
+
+        document.getElementById('promptConfirmBtn').onclick = handleAction;
+        document.getElementById('promptInput').onkeydown = (e) => {
+            if (e.key === 'Enter') handleAction();
+        };
     },
 
     formatDate: (dateStr) => {

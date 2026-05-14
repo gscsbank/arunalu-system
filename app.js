@@ -64,23 +64,45 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             const view = e.currentTarget.dataset.view;
             if (view && view !== currentView) {
-                switchView(view);
-
-                // Update active state
-                navLinks.forEach(l => {
-                    l.classList.remove('active-nav');
-                    l.style.borderLeft = 'none';
-                });
-
-                e.currentTarget.classList.add('active-nav');
-
-                // Close sidebar on mobile after navigation
-                if (window.innerWidth <= 768) {
-                    sidebar.classList.remove('mobile-active');
+                // Settings Protection Logic
+                if (view === 'settings') {
+                    window.utils.showPrompt(
+                        "Admin Access Required", 
+                        "Please enter an admin password to access system settings.",
+                        async (password) => {
+                            const isAdmin = await auth.verifyAdmin(password);
+                            if (isAdmin) {
+                                performViewSwitch(view, e.currentTarget);
+                            } else {
+                                window.utils.showToast("Invalid Admin Password", "error");
+                            }
+                        },
+                        "password"
+                    );
+                    return;
                 }
+
+                performViewSwitch(view, e.currentTarget);
             }
         });
     });
+
+    function performViewSwitch(view, linkElement) {
+        switchView(view);
+
+        // Update active state
+        navLinks.forEach(l => {
+            l.classList.remove('active-nav');
+            l.style.borderLeft = 'none';
+        });
+
+        linkElement.classList.add('active-nav');
+
+        // Close sidebar on mobile after navigation
+        if (window.innerWidth <= 768) {
+            sidebar.classList.remove('mobile-active');
+        }
+    }
 
     // View Switching Logic
     async function switchView(view) {

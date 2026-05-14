@@ -229,12 +229,12 @@ window.openTransactionModal = async (type) => {
 
     const html = `
         <h3 class="text-xl font-bold text-gray-800 mb-6">${title}</h3>
-        <form id="txForm" class="space-y-5 max-h-[75vh] overflow-y-auto px-1 custom-scrollbar" onsubmit="window.saveTransaction(event, '${type}')">
+        <form id="txForm" data-type="${type}" class="space-y-5 max-h-[75vh] overflow-y-auto px-1 custom-scrollbar" onsubmit="window.saveTransaction(event, '${type}')">
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Date <span class="text-red-500">*</span></label>
-                    <input type="date" id="txDate" required onchange="const input = document.getElementById('txPayerInput'); if(input && input.value) window.handleTxMemberSelection(input.value)" value="${new Date().toISOString().split('T')[0]}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
+                    <input type="date" id="txDate" required onchange="const input = document.getElementById('txPayerInput'); if(input && input.value) window.handleTxMemberSelection(input.value, '${type}')" value="${new Date().toISOString().split('T')[0]}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Reference No</label>
@@ -245,7 +245,7 @@ window.openTransactionModal = async (type) => {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Payer / Member</label>
-                    <input list="membersList" id="txPayerInput" onchange="window.handleTxMemberSelection(this.value)" oninput="window.handleTxMemberSelection(this.value)" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all bg-white" placeholder="Search member..." autocomplete="off">
+                    <input list="membersList" id="txPayerInput" onchange="window.handleTxMemberSelection(this.value, '${type}')" oninput="window.handleTxMemberSelection(this.value, '${type}')" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all bg-white" placeholder="Search member..." autocomplete="off">
                     <input type="hidden" id="txMemberId">
                     <datalist id="membersList">
                         ${memOptions}
@@ -312,16 +312,14 @@ window.openTransactionModal = async (type) => {
         if (type === 'Receipt') {
             const isSAP = window.currentUnit === 'SAP';
             const welfarAcc = accounts.find(a => a.accountName && a.accountName.includes(isSAP ? 'SAP මුදල් පොත' : 'සුභ සාධක අරමුදල්'));
-            const memberAcc = accounts.find(a => a.accountName && a.accountName.includes(isSAP ? 'සිතුමිණ තැන්පත් ගිණුම' : 'සාමාජික අරමුදල්'));
-            const contributionAcc = accounts.find(a => a.accountName && a.accountName.includes('දායක අරමුදල්'));
+            const monthlyAcc = accounts.find(a => a.accountName && a.accountName.includes(isSAP ? 'සිතුමිණ තැන්පත් ගිණුම' : 'මාසික සාමාජික මුදල්'));
 
-            if (welfarAcc || memberAcc || contributionAcc) {
+            if (welfarAcc || monthlyAcc) {
                 if (isSAP) {
                     if (welfarAcc) window.addTxLineRow(welfarAcc.id);
                 } else {
                     if (welfarAcc) window.addTxLineRow(welfarAcc.id);
-                    if (memberAcc) window.addTxLineRow(memberAcc.id);
-                    if (contributionAcc) window.addTxLineRow(contributionAcc.id);
+                    if (monthlyAcc) window.addTxLineRow(monthlyAcc.id);
                 }
             } else {
                 window.addTxLineRow();
@@ -623,78 +621,148 @@ window.printTransaction = async (id) => {
 
     if (tx.type === 'Payment') {
         // A5 Formal Layout for Payments - Doubled for A4 (Original + Office Copy)
-        const voucherHtml = (label) => `
-            <div style="width: 210mm; height: 148.5mm; padding: 15mm; font-family: 'Inter', sans-serif; color: black; background: white; border-bottom: 1px dashed #ccc; box-sizing: border-box; position: relative; overflow: hidden;">
-                <div style="position: absolute; right: 15mm; top: 15mm; font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; border: 1px solid #e2e8f0; padding: 1mm 3mm; border-radius: 4px;">${label}</div>
+        const voucherHtml = (label) => {
+            const isOriginal = label.includes('Original');
+            
+            let sigAreaHtml = '';
+            if (isOriginal) {
+                // Original Copy: Received by (Name/Sig) and Treasurer
+                sigAreaHtml = `
+                    <div style="display: flex; justify-content: space-between; margin-top: 10mm; align-items: flex-end;">
+                        <div style="width: 55%; text-align: left;">
+                            <div style="margin-bottom: 5mm;">..................................................................</div>
+                            <div style="font-size: 10px; font-weight: 800;">මුදල් භාරගත් බවට නම සහ අත්සන (Received by Name & Signature)</div>
+                        </div>
+                        <div style="width: 40%; text-align: right;">
+                            <div style="margin-bottom: 5mm;">................................................</div>
+                            <div style="font-size: 10px; font-weight: 800;">භාණ්ඩාගාරික (Treasurer)</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Office Copy: 4 Signatures in a 2x2 Table for better print compatibility
+                sigAreaHtml = `
+                    <table style="width: 100%; margin-top: 10mm; border: none; border-collapse: collapse;">
+                        <tr>
+                            <td style="width: 50%; padding-bottom: 8mm; vertical-align: bottom; text-align: left;">
+                                <div style="margin-bottom: 4mm;">................................................</div>
+                                <div style="font-size: 9px; font-weight: 800;">මුදල් භාරදුන් බවට භාණ්ඩාගාරික (Handed over by Treasurer)</div>
+                            </td>
+                            <td style="width: 50%; padding-bottom: 8mm; vertical-align: bottom; text-align: right;">
+                                <div style="margin-bottom: 4mm;">................................................</div>
+                                <div style="font-size: 9px; font-weight: 800;">මුදල් භාරගත් බවට නම සහ අත්සන (Received by Name & Signature)</div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="width: 50%; vertical-align: bottom; text-align: left;">
+                                <div style="margin-bottom: 4mm;">................................................</div>
+                                <div style="font-size: 9px; font-weight: 800;">පරීක්ෂා කළේ: විගණන නිලධාරී (Checked by Auditor)</div>
+                            </td>
+                            <td style="width: 50%; vertical-align: bottom; text-align: right;">
+                                <div style="margin-bottom: 4mm;">................................................</div>
+                                <div style="font-size: 9px; font-weight: 800;">අනුමත කළේ: සභාපති (Approved by Chairman)</div>
+                            </td>
+                        </tr>
+                    </table>
+                `;
+            }
+
+            return `
+            <div style="width: 210mm; height: 148.5mm; padding: 8mm; ${!isOriginal ? 'padding-left: 20mm;' : ''} font-family: 'Inter', 'Iskoola Pota', sans-serif; color: black; background: white; border-bottom: 2px dashed #000; box-sizing: border-box; position: relative; overflow: hidden; border: 1.5px solid #000;">
+                <!-- Label Badge -->
+                <div style="position: absolute; right: 8mm; top: 8mm; font-size: 8px; font-weight: 900; color: #333; text-transform: uppercase; border: 1px solid #000; padding: 1mm 2mm; background: #eee;">${label}</div>
                 
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid black; padding-bottom: 10mm; margin-bottom: 8mm;">
-                    <div>
-                        <h1 style="font-size: 24px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: -1px;">${(tx.unit || 'Main') === 'SAP' ? 'SAP CENTER - ARUNALU' : 'Arunalu Welfare Society'}</h1>
-                        <p style="font-size: 12px; color: #444; margin: 2px 0;">Galapitiyagama, Nikaweratiya</p>
-                        <p style="font-size: 10px; font-weight: bold; text-transform: uppercase; color: #666;">${(tx.unit || 'Main') === 'SAP' ? 'SAP CENTER PROJECT - WELFARE BRANCH' : 'Galapitiyagama Sanasa Society - Welfare Branch'}</p>
-                    </div>
-                    <div style="text-align: right;">
-                        <h2 style="font-size: 20px; font-weight: 800; margin: 0;">${title}</h2>
-                        <p style="font-size: 14px; font-weight: bold; margin-top: 4px;">Ref: ${tx.reference || '-'}</p>
+                <!-- Header -->
+                <div style="display: flex; gap: 10mm; margin-bottom: 3mm;">
+                    <div style="flex: 1;">
+                        <h1 style="font-size: 16px; font-weight: 900; margin: 0; color: #000;">${(tx.unit || 'Main') === 'SAP' ? 'SAP CENTER - ARUNALU' : 'Arunalu Welfare Society'}</h1>
+                        <p style="font-size: 10px; font-weight: bold; margin: 1px 0;">Galapitiyagama, Nikaweratiya</p>
+                        <p style="font-size: 10px; font-weight: 900; color: #000; text-transform: uppercase;">${(tx.unit || 'Main') === 'SAP' ? 'SAP CENTER PROJECT - WELFARE BRANCH' : 'Galapitiyagama Sanasa Society - Welfare Branch'}</p>
                     </div>
                 </div>
 
-                <div style="display: flex; justify-content: space-between; margin-bottom: 8mm; font-size: 14px;">
-                    <div>
-                        <span style="color: #666; text-transform: uppercase; font-size: 10px; font-weight: 800; display: block; margin-bottom: 2px;">Paid To:</span>
-                        <span style="font-size: 18px; font-weight: 800;">${memberLabel}</span>
-                    </div>
-                    <div style="text-align: right;">
-                        <span style="color: #666; text-transform: uppercase; font-size: 10px; font-weight: 800; display: block; margin-bottom: 2px;">Date:</span>
-                        <span style="font-size: 16px; font-weight: 700;">${window.utils.formatDate(tx.date)}</span>
+                <!-- Title & Metadata Boxes -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 3mm;">
+                    <div style="font-size: 14px; font-weight: 900; text-decoration: underline; text-transform: uppercase;">මුදල් ගෙවීමේ වවුචරය (PAYMENT VOUCHER)</div>
+                    <div style="display: flex; gap: 3mm; align-items: flex-end;">
+                        <div style="display: flex; flex-direction: column; gap: 1mm;">
+                            <div style="display: flex; align-items: center; border: 1px solid #000; padding: 0.5mm 2mm;">
+                                <span style="font-size: 9px; font-weight: 800; margin-right: 2mm;">වවුචර අංකය:</span>
+                                <span style="font-size: 11px; font-weight: 900;">${tx.reference || '-'}</span>
+                            </div>
+                            ${!isOriginal ? `
+                            <div style="display: flex; align-items: center; border: 1px solid #000; padding: 0.5mm 2mm;">
+                                <span style="font-size: 7px; font-weight: 800; margin-right: 1mm;">බැංකු මුදල් ලබාගැනීමේ අංකය:</span>
+                                <span style="width: 25mm; height: 3mm;"></span> <!-- Blank space for manual entry -->
+                            </div>
+                            ` : ''}
+                        </div>
+                        <div style="display: flex; align-items: center; border: 1px solid #000; padding: 0.5mm 2mm; height: fit-content;">
+                            <span style="font-size: 9px; font-weight: 800; margin-right: 2mm;">දිනය:</span>
+                            <span style="font-size: 11px; font-weight: 900;">${window.utils.formatDate(tx.date)}</span>
+                        </div>
+                        <!-- QR Code via API (More reliable for print) -->
+                        <div style="margin-left: 1mm;">
+                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`AWS | ${tx.reference} | ${memberLabel.split(' - ')[1] || memberLabel} | Rs.${total.toFixed(2)} | ${window.utils.formatDate(tx.date)} | ${entries.filter(e => e.debit > 0).map(e => accMap[e.accountId]?.accountName || '').join(', ')}`)}" style="width: 18mm; height: 18mm; border: 1px solid #eee;" />
+                        </div>
                     </div>
                 </div>
 
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 10mm;">
+                <!-- Payee Info -->
+                <div style="margin-bottom: 3mm; border-bottom: 1px dotted #000; padding-bottom: 0.5mm;">
+                    <span style="font-size: 10px; font-weight: 800;">සාමාජික අංකය සහ නම (Member No & Name):</span>
+                    <span style="font-size: 12px; font-weight: 900; margin-left: 2mm;">${memberLabel}</span>
+                </div>
+
+                <!-- Main Table -->
+                <table style="width: 100%; border: 1.5px solid #000; border-collapse: collapse; margin-bottom: 4mm;">
                     <thead>
-                        <tr style="border-bottom: 2px solid black;">
-                            <th style="text-align: left; padding: 3mm 0; font-size: 12px; text-transform: uppercase; font-weight: 800;">Description of Payment</th>
-                            <th style="text-align: right; padding: 3mm 0; font-size: 12px; text-transform: uppercase; font-weight: 800; width: 40mm;">Amount (Rs.)</th>
+                        <tr style="border-bottom: 1.5px solid #000; background: #f9f9f9;">
+                            <th style="text-align: center; padding: 1.5mm; font-size: 10px; font-weight: 900; border-right: 1.5px solid #000;">ගෙවීම් පිළිබඳ විස්තරය (Description of Payment)</th>
+                            <th style="text-align: center; padding: 1.5mm; font-size: 10px; font-weight: 900; width: 40mm;">මුදල (Amount Rs.)</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${linesHtml}
-                        <tr style="border-top: 2px solid black;">
-                            <td style="text-align: right; padding: 4mm 0; font-weight: 800; font-size: 14px;">TOTAL AMOUNT PAID</td>
-                            <td style="text-align: right; padding: 4mm 0; font-weight: 900; font-size: 18px;">${total.toFixed(2)}</td>
+                        <tr style="height: 20mm; vertical-align: top;">
+                            <td style="padding: 2mm; font-size: 11px; border-right: 1.5px solid #000; line-height: 1.4;">
+                                ${entries.filter(e => e.debit > 0).map(e => `• ${accMap[e.accountId]?.accountName || 'Unknown'}`).join('<br>')}
+                                ${tx.description ? `<br><div style="margin-top: 1.5mm; font-style: italic; font-size: 10px;">Note: ${tx.description}</div>` : ''}
+                            </td>
+                            <td style="padding: 2mm; font-size: 12px; font-weight: 900; text-align: right;">
+                                ${entries.filter(e => e.debit > 0).map(e => `<div>${e.debit.toFixed(2)}</div>`).join('')}
+                            </td>
+                        </tr>
+                        <tr style="border-top: 1.5px solid #000; font-weight: 900; background: #eee;">
+                            <td style="text-align: right; padding: 2mm; font-size: 11px; border-right: 1.5px solid #000; text-transform: uppercase;">මුළු එකතුව (GRAND TOTAL)</td>
+                            <td style="text-align: right; padding: 2mm; font-size: 13px;">${total.toFixed(2)}</td>
                         </tr>
                     </tbody>
                 </table>
 
-                <div style="display: flex; justify-content: space-between; margin-top: auto; padding-top: 5mm;">
-                    <div style="text-align: center; width: 30%;">
-                        <div style="border-top: 1.5px solid black; padding-top: 2mm;">
-                            <div style="font-size: 11px; font-weight: 800;">Member / Payee</div>
-                            <div style="font-size: 9px; color: #666;">සාමාජිකයාගේ අත්සන</div>
-                        </div>
-                    </div>
-                    <div style="text-align: center; width: 30%;">
-                        <div style="border-top: 1.5px solid black; padding-top: 2mm;">
-                            <div style="font-size: 11px; font-weight: 800;">${(tx.unit || 'Main') === 'SAP' ? 'SAP CENTER MANAGER' : 'Treasurer'}</div>
-                            <div style="font-size: 9px; color: #666;">${(tx.unit || 'Main') === 'SAP' ? 'SAP මධ්‍යස්ථාන කළමනාකරු' : 'භාණ්ඩාගාරික'}</div>
-                        </div>
-                    </div>
-                    <div style="text-align: center; width: 30%;">
-                        <div style="border-top: 1.5px solid black; padding-top: 2mm;">
-                            <div style="font-size: 11px; font-weight: 800;">Chairman</div>
-                            <div style="font-size: 9px; color: #666;">සභාපති</div>
-                        </div>
-                    </div>
+                ${sigAreaHtml}
+
+                <!-- Vertical Developer Branding -->
+                <div style="position: absolute; right: 1mm; bottom: 60mm; transform: rotate(-90deg); transform-origin: right bottom; font-size: 7px; color: #999; white-space: nowrap; font-weight: bold; font-style: italic; letter-spacing: 0.5px; text-transform: uppercase; pointer-events: none;">
+                    System - iraasoft solution 0752895951
                 </div>
             </div>
-        `;
+            `;
+        };
 
         printArea.innerHTML = `
+            <style>
+                @media print {
+                    @page { size: A4 portrait; margin: 0; }
+                    html, body { width: 210mm !important; margin: 0 !important; padding: 0 !important; }
+                    #printArea { width: 210mm !important; }
+                }
+            </style>
             <div style="width: 210mm; background: white;">
                 ${voucherHtml('Original Copy - Member')}
                 ${voucherHtml('Office Copy - Society')}
             </div>
         `;
+
     } else {
         // Standard Thermal Layout for Receipts/Transfers - Optimized for 55mm Bluetooth Printers
         let statusTagHtml = '';
@@ -708,7 +776,15 @@ window.printTransaction = async (id) => {
         }
 
         printArea.innerHTML = `
-            <div style="width: 55mm; max-width: 55mm; margin: 0 auto; padding: 1mm; font-family: 'Inter', 'Iskoola Pota', 'Nirmala UI', sans-serif; font-size: 10px; line-height: 1.2; color: black; background: white;">
+            <style>
+                @media print {
+                    @page { size: 55mm auto; margin: 0; }
+                    html, body { width: 55mm !important; margin: 0 !important; padding: 0 !important; overflow: hidden; }
+                    #printArea { width: 55mm !important; margin: 0 !important; padding: 0 !important; }
+                    .no-print { display: none !important; }
+                }
+            </style>
+            <div style="width: 55mm; max-width: 55mm; margin: 0 auto; padding: 2mm; font-family: 'Inter', 'Iskoola Pota', sans-serif; font-size: 10px; line-height: 1.2; color: black; background: white;">
                 
                 <div style="text-align: center; margin-bottom: 6px;">
                     <h1 style="font-size: 13px; font-weight: 900; margin: 0; line-height: 1.1; text-transform: uppercase;">${(tx.unit || 'Main') === 'SAP' ? 'SAP CENTER - ARUNALU' : 'Arunalu Welfare Society'}</h1>
@@ -763,15 +839,24 @@ window.printTransaction = async (id) => {
         `;
     }
 
-    // Wait a brief moment to ensure DOM is updated
-    requestAnimationFrame(() => {
+    // Wait for all images (especially the QR code) to load before printing
+    const images = printArea.getElementsByTagName('img');
+    const imagePromises = Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+            img.onload = resolve;
+            img.onerror = resolve; // Continue even if one fails
+        });
+    });
+
+    Promise.all(imagePromises).then(() => {
         setTimeout(() => {
             window.print();
-            // Cleanup after print dialog closes
+            // Cleanup
             setTimeout(() => {
                 printArea.innerHTML = '';
             }, 500);
-        }, 200);
+        }, 300); // Small extra buffer for rendering
     });
 };
 
@@ -967,10 +1052,26 @@ window.selectMemberInTx = async (memberId) => {
     }
 };
 
-window.handleTxMemberSelection = async (value) => {
+window.handleTxMemberSelection = async (value, type = null) => {
+    const form = document.getElementById('txForm');
+    const txType = type || form?.dataset.type || 'Receipt';
+    
     const container = document.getElementById('duesSummaryContainer');
-    if (!container || window.currentUnit === 'SAP') {
+    if (!container || window.currentUnit === 'SAP' || txType === 'Payment') {
         if (container) container.classList.add('hidden');
+        
+        // Even if hiding dues, we still need to set the member ID for the transaction
+        const members = await db.members.toArray();
+        const lowerVal = value.trim().toLowerCase();
+        const matched = members.find(m => {
+            const mNo = String(m.memberNo || '').trim().toLowerCase();
+            const mName = String(m.name || '').trim().toLowerCase();
+            const combined = `${mNo} - ${mName}`;
+            return combined === lowerVal || mNo === lowerVal || mName === lowerVal;
+        });
+        const hiddenIdInput = document.getElementById('txMemberId');
+        if (hiddenIdInput) hiddenIdInput.value = matched ? matched.id : '';
+        
         return;
     }
 
@@ -991,8 +1092,10 @@ window.handleTxMemberSelection = async (value) => {
         return;
     }
 
-    const txDate = document.getElementById('txDate')?.value; const dues = await window.getMemberDues(matched.id, txDate);
+    const txDate = document.getElementById('txDate')?.value; 
+    const dues = await window.getMemberDues(matched.id, txDate);
     const totalDue = dues.entranceDue + dues.monthlyDue + dues.funeralDue + dues.arrearsDue;
+    const entranceRate = await window.getEffectiveRate('ඇතුලත්වීමේ ගාස්තු ලැබීම්', txDate || new Date().toISOString().split('T')[0]);
 
     let warningHtml = '';
     // ... (rest of warning logic) ...
@@ -1008,7 +1111,7 @@ window.handleTxMemberSelection = async (value) => {
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <button type="button" onclick="window.renewMemberMembership(${matched.id})" class="bg-red-600 text-white py-2 rounded-lg font-bold hover:bg-red-700 transition-colors text-[10px] uppercase tracking-wider shadow-md">
-                        Renew as New Member (රු. 13,000)
+                        Renew as New Member (රු. ${entranceRate.toLocaleString()})
                     </button>
                     <button type="button" onclick="window.autoFillDues(${matched.id});" class="bg-amber-600 text-white py-2 rounded-lg font-bold hover:bg-amber-700 transition-colors text-[10px] uppercase tracking-wider shadow-md">
                         Pay Arrears (හිඟ මුදල් ගෙවන්න)
@@ -1026,7 +1129,7 @@ window.handleTxMemberSelection = async (value) => {
                     <i class="fa-solid fa-circle-info text-lg"></i>
                     <div>
                         <div class="font-bold text-[11px]">නව සාමාජික (New Member - Grace Period)</div>
-                        <div class="text-[10px] opacity-80">ඇතුලත්වීමේ ගාස්තුව රු. 13,000 මාස 6ක් තුල ගෙවා නිම කළ යුතුය. මරණාධාර ලබා ගැනීමට පෙර සම්පූර්ණ මුදල ගෙවිය යුතුය.</div>
+                        <div class="text-[10px] opacity-80">ඇතුලත්වීමේ ගාස්තුව රු. ${entranceRate.toLocaleString()} මාස 6ක් තුල ගෙවා නිම කළ යුතුය. මරණාධාර ලබා ගැනීමට පෙර සම්පූර්ණ මුදල ගෙවිය යුතුය.</div>
                     </div>
                 </div>
             </div>
@@ -1057,27 +1160,47 @@ window.handleTxMemberSelection = async (value) => {
 };
 
 window.renewMemberMembership = async (memberId) => {
-    if (!confirm("Are you sure you want to renew this membership? This will reset the join date to today and apply the Rs. 13,000 new member fee.")) return;
+    const today = new Date().toISOString().split('T')[0];
+    const entranceRate = await window.getEffectiveRate('ඇතුලත්වීමේ ගාස්තු ලැබීම්', today);
+    
+    window.utils.showConfirm(
+        "Renew Membership?", 
+        `Are you sure you want to renew this membership? This will reset the join date to today and apply the Rs. ${entranceRate.toLocaleString()} new member fee.`,
+        async () => {
+            try {
+                await db.members.update(memberId, {
+                    joinedDate: today,
+                    openingEntrancePaid: 0,
+                    openingPaidUntil: ''
+                });
 
-    try {
-        const today = new Date().toISOString().split('T')[0];
-        await db.members.update(memberId, {
-            joinedDate: today,
-            openingEntrancePaid: 0,
-            openingPaidUntil: ''
-        });
-
-        window.utils.showToast("Membership renewed as a New Member.");
-        
-        // Refresh the dues display
-        const payerInput = document.getElementById('txPayerInput');
-        if (payerInput) {
-            window.handleTxMemberSelection(payerInput.value);
-        }
-    } catch (err) {
-        console.error(err);
-        window.utils.showToast("Error renewing membership", "error");
-    }
+                window.utils.showToast("Membership renewed as a New Member.");
+                
+                // Refresh the dues display
+                const payerInput = document.getElementById('txPayerInput');
+                if (payerInput) {
+                    await window.handleTxMemberSelection(payerInput.value);
+                    
+                    // Specialized Auto-fill: Clear and add ONLY the entrance fee for renewal
+                    const container = document.getElementById('txLinesContainer');
+                    if (container) {
+                        container.innerHTML = ''; // Clear everything
+                        const accounts = await db.accounts.toArray();
+                        const entranceAcc = accounts.find(a => a.accountName === 'ඇතුලත්වීමේ ගාස්තු ලැබීම්' || a.accountName.includes('Entrance Fee'));
+                        if (entranceAcc) {
+                            window.addTxLineWithAmount(entranceAcc.id, entranceRate);
+                            window.calculateTxTotal();
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                window.utils.showToast("Error renewing membership", "error");
+            }
+        },
+        "Confirm Renew",
+        "warning"
+    );
 };
 
 window.getMemberDues = async (memberId, asOfDate = null) => {
@@ -1101,7 +1224,7 @@ window.getMemberDues = async (memberId, asOfDate = null) => {
     const joinDateStr = member.joinedDate || '';
     const joinDate = new Date(joinDateStr);
 
-    // 1. Entrance Fee (Max 13,000)
+    const entranceRate = await window.getEffectiveRate('ඇතුලත්වීමේ ගාස්තු ලැබීම්', joinDateStr || new Date().toISOString().split('T')[0]);
     let entrancePaid = 0;
     if (entranceAcc) {
         const entranceEntries = await db.entries.where('accountId').equals(entranceAcc.id).toArray();
@@ -1113,9 +1236,9 @@ window.getMemberDues = async (memberId, asOfDate = null) => {
             }
         }
     }
-    const entranceDue = Math.max(0, 13000 - (entrancePaid + (member.openingEntrancePaid || 0)));
+    const entranceDue = Math.max(0, entranceRate - (entrancePaid + (member.openingEntrancePaid || 0)));
 
-    // 2. Monthly Dues (Rs. 300 total)
+    // 2. Monthly Dues
     let monthlyDue = 0;
     let monthsBehind = 0; let monthlyAdvance = 0;
     if (joinDateStr !== '') {
@@ -1127,9 +1250,17 @@ window.getMemberDues = async (memberId, asOfDate = null) => {
         }
 
         const now = asOfDate ? new Date(asOfDate) : new Date();
-        monthsBehind = (now.getFullYear() - referenceDate.getFullYear()) * 12 + (now.getMonth() - referenceDate.getMonth());
+        
+        let totalMonthlyExpected = 0;
+        let cursor = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 1);
+        
+        while (cursor.getFullYear() < now.getFullYear() || (cursor.getFullYear() === now.getFullYear() && cursor.getMonth() <= now.getMonth())) {
+            const dateStr = cursor.toISOString().split('T')[0];
+            const rate = await window.getEffectiveRate('මාසික සාමාජික මුදල් ලැබීම්', dateStr);
+            totalMonthlyExpected += rate;
+            cursor.setMonth(cursor.getMonth() + 1);
+        }
 
-        const totalMonthlyExpected = monthsBehind * 300;
         let monthlyPaid = 0;
         if (monthlyAccIds.length > 0) {
             const mEntries = await db.entries.where('accountId').anyOf(monthlyAccIds).toArray();
@@ -1144,11 +1275,12 @@ window.getMemberDues = async (memberId, asOfDate = null) => {
         const monthlyBal = totalMonthlyExpected - monthlyPaid - (member.openingAdvMonthly || 0) - (member.openingAdvMembership || 0) - (member.openingAdvContribution || 0);
         monthlyDue = Math.max(0, monthlyBal);
         monthlyAdvance = Math.max(0, -monthlyBal);
-        // Re-calculate actual months behind based on remaining balance
-        monthsBehind = Math.floor(monthlyDue / 300);
+        
+        // Re-calculate actual months behind for status flags
+        monthsBehind = (now.getFullYear() - referenceDate.getFullYear()) * 12 + (now.getMonth() - referenceDate.getMonth());
     }
 
-    // 3. Funeral Dues (Rs. 200 each)
+    // 3. Funeral Dues
     let funeralDue = 0;
     let validFuneralCount = 0;
     if (joinDateStr !== '' && funeralAcc) {
@@ -1185,7 +1317,11 @@ window.getMemberDues = async (memberId, asOfDate = null) => {
         });
 
         validFuneralCount = eligibleFunerals.length;
-        const totalFuneralExpected = validFuneralCount * 200;
+        let totalFuneralExpected = 0;
+        for (let f of eligibleFunerals) {
+            const fRate = await window.getEffectiveRate('සුභ සාධක අරමුදල් ලැබීම්', f.date);
+            totalFuneralExpected += fRate;
+        }
 
         let funeralPaid = 0;
         const fEntries = await db.entries.where('accountId').equals(funeralAcc.id).toArray();
@@ -1402,8 +1538,14 @@ window.saveFuneral = async (e) => {
 };
 
 window.deleteFuneral = async (id) => {
-    if (confirm("Remove this funeral record?")) {
-        await db.funerals.delete(id);
-        window.openFuneralModal();
-    }
+    window.utils.showConfirm(
+        "Delete Record?", 
+        "Remove this funeral record?",
+        async () => {
+            await db.funerals.delete(id);
+            window.openFuneralModal();
+        },
+        "Confirm Remove",
+        "warning"
+    );
 };

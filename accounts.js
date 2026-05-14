@@ -309,13 +309,19 @@ window.deleteAccount = async (id) => {
         return;
     }
 
-    if (confirm('Are you sure you want to delete this account?')) {
-        try {
-            await db.accounts.delete(id);
-            window.utils.showToast('Account deleted successfully');
-            loadAccountsTable();
-        } catch (err) {
-            window.utils.showToast('Error deleting account', 'error');
-        }
-    }
+    window.utils.showConfirm(
+        "Delete Account?", 
+        "Are you sure you want to delete this account? This action cannot be undone.",
+        async () => {
+            try {
+                await db.accounts.delete(id);
+                window.utils.showToast('Account deleted successfully');
+                loadAccountsTable();
+            } catch (err) {
+                window.utils.showToast('Error deleting account', 'error');
+            }
+        },
+        "Confirm Delete",
+        "warning"
+    );
 };

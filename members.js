@@ -169,6 +169,7 @@ window.viewMemberProfile = async (id) => {
     // Calculate dues
     const dues = await window.getMemberDues(id);
     const totalDue = dues.entranceDue + dues.monthlyDue + dues.funeralDue;
+    const entranceRate = await window.getEffectiveRate('ඇතුලත්වීමේ ගාස්තු ලැබීම්', new Date().toISOString().split('T')[0]);
 
     const html = `
         <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-3">
@@ -226,7 +227,7 @@ window.viewMemberProfile = async (id) => {
                  ` : (dues.isInvalid ? `
                     <div class="grid grid-cols-2 gap-2 mt-4">
                         <button onclick="window.renewMemberMembership(${member.id}).then(() => { window.openTransactionModal('Receipt'); setTimeout(() => window.selectMemberInTx(${member.id}), 500); })" class="bg-red-600 hover:bg-red-700 py-2 rounded-lg text-[10px] font-bold transition-all border border-red-500 shadow-lg">
-                            Renew (13,000)
+                            Renew (${entranceRate.toLocaleString()})
                         </button>
                         <button onclick="window.openTransactionModal('Receipt'); setTimeout(() => window.selectMemberInTx(${member.id}), 500)" class="bg-amber-600 hover:bg-amber-700 py-2 rounded-lg text-[10px] font-bold transition-all border border-amber-500 shadow-lg">
                             Pay Arrears
@@ -579,14 +580,20 @@ window.editMember = (id) => {
 };
 
 window.deleteMember = async (id) => {
-    if (confirm('Are you sure you want to delete this member? This action cannot be undone.')) {
-        try {
-            await db.members.delete(id);
-            window.utils.showToast('Member deleted successfully');
-            loadMembersTable();
-            if (window.refreshCurrentView) window.refreshCurrentView();
-        } catch (err) {
-            window.utils.showToast('Error deleting member', 'error');
-        }
-    }
+    window.utils.showConfirm(
+        "Delete Member?", 
+        "Are you sure you want to delete this member? This action cannot be undone.",
+        async () => {
+            try {
+                await db.members.delete(id);
+                window.utils.showToast('Member deleted successfully');
+                loadMembersTable();
+                if (window.refreshCurrentView) window.refreshCurrentView();
+            } catch (err) {
+                window.utils.showToast('Error deleting member', 'error');
+            }
+        },
+        "Confirm Delete",
+        "warning"
+    );
 };

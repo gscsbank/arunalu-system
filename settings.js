@@ -1,26 +1,27 @@
-// Settings Module - Handle dynamic dues rates
-async function renderSettings() {
+window.renderSettings = async () => {
     const allSettings = await db.settings.toArray();
     const users = await db.users.toArray();
 
     const types = [
         { key: 'ඇතුලත්වීමේ ගාස්තු ලැබීම්', label: 'ඇතුලත්වීමේ ගාස්තුව (Entrance Fee)', default: 13000 },
-        { key: 'දායක අරමුදල් ලැබීම්', label: 'දායක අරමුදල (Contribution - Rs. 100)', default: 100 },
-        { key: 'සාමාජික අරමුදල් ලැබීම්', label: 'සාමාජික අරමුදල (Membership - Rs. 200)', default: 200 },
-        { key: 'සුභ සාධක අරමුදල් ලැබීම්', label: 'සුභ සාධක අරමුදල (Funeral - Rs. 200)', default: 200 }
+        { key: 'මාසික සාමාජික මුදල් ලැබීම්', label: 'මාසික සාමාජික මුදල (Monthly Membership Fee)', default: 300 },
+        { key: 'සුභ සාධක අරමුදල් ලැබීම්', label: 'සුභ සාධක අරමුදල (Funeral)', default: 200 }
     ];
 
+    const today = new Date().toISOString().split('T')[0];
     let ratesHtml = '';
     for (let t of types) {
         const history = allSettings.filter(s => s.type === t.key).sort((a, b) => new Date(b.effectiveDate) - new Date(a.effectiveDate));
-        const current = history[0] || { amount: t.default, effectiveDate: 'Default' };
+        const effectiveToday = await window.getEffectiveRate(t.key, today);
+        const latestChange = history[0] || { amount: t.default, effectiveDate: 'Default' };
+        
         ratesHtml += `
             <div class="glass-panel p-5 rounded-2xl border border-gray-100 flex flex-col h-full bg-white/50">
                 <div class="flex justify-between items-start mb-4">
                     <h4 class="font-bold text-gray-800 text-sm">${t.label}</h4>
-                    <div class="bg-brand-50 text-brand-600 px-2 py-0.5 rounded font-black">Rs. ${current.amount}</div>
+                    <div class="bg-brand-50 text-brand-600 px-2 py-0.5 rounded font-black">Rs. ${effectiveToday}</div>
                 </div>
-                <div class="text-[10px] text-gray-400 font-bold mb-4 uppercase">VALID FROM: ${window.utils.formatDate(current.effectiveDate)}</div>
+                <div class="text-[10px] text-gray-400 font-bold mb-4 uppercase">Latest Change: ${window.utils.formatDate(latestChange.effectiveDate)} (${latestChange.amount})</div>
                 <button onclick="window.openRateChangeModal('${t.key}', '${t.label}')" class="mt-auto w-full bg-gray-50 text-gray-600 hover:bg-brand-50 hover:text-brand-600 py-2 rounded-xl text-xs font-bold transition-all border border-gray-100 uppercase tracking-tighter">Change Rate</button>
             </div>
         `;
@@ -141,7 +142,7 @@ window.switchSettingsTab = (tab) => {
     document.getElementById('tab-backup').className = tab === 'backup' ? 'px-4 py-2 rounded-lg text-sm font-bold transition-all bg-white shadow-sm text-brand-600' : 'px-4 py-2 rounded-lg text-sm font-bold transition-all text-gray-500 hover:text-gray-700';
 };
 
-function mountSettings() { }
+window.mountSettings = () => { };
 
 window.openUserModal = async (userId = null) => {
     let user = { name: '', username: '', role: 'User', password: '' };
@@ -214,11 +215,17 @@ window.deleteUser = async (userId) => {
         utils.showToast("You cannot delete yourself!", "error");
         return;
     }
-    if (confirm("Are you sure you want to delete this user?")) {
-        await db.users.delete(userId);
-        utils.showToast("User deleted.");
-        window.refreshCurrentView();
-    }
+    window.utils.showConfirm(
+        "Delete User?", 
+        "Are you sure you want to delete this user? They will no longer be able to access the system.",
+        async () => {
+            await db.users.delete(userId);
+            utils.showToast("User deleted.");
+            window.refreshCurrentView();
+        },
+        "Confirm Delete",
+        "warning"
+    );
 };
 
 window.openRateChangeModal = (key, label) => {
@@ -255,9 +262,9 @@ window.saveRateChange = async () => {
     if (!amount || !effectiveDate) return;
 
     await db.settings.add({ type, amount, effectiveDate });
-    utils.showToast("Rate updated successfully!");
+    utils.showToast("Rate updated successfully! Reloading...");
     utils.closeModal();
-    window.refreshCurrentView();
+    setTimeout(() => window.location.reload(), 1000);
 };
 
 // Global helper to get effective rate
@@ -266,18 +273,30 @@ window.getEffectiveRate = async (type, date) => {
     if (settings.length === 0) {
         // Defaults if no setting found
         if (type === 'ඇතුලත්වීමේ ගාස්තු ලැබීම්') return 13000;
-        if (type === 'දායක අරමුදල් ලැබීම්') return 100;
-        if (type === 'සාමාජික අරමුදල් ලැබීම්') return 200;
+        if (type === 'මාසික සාමාජික මුදල් ලැබීම්') return 300;
         if (type === 'සුභ සාධක අරමුදල් ලැබීම්') return 200;
         return 0;
     }
 
-    // Sort by date descending
-    settings.sort((a, b) => new Date(b.effectiveDate) - new Date(a.effectiveDate));
+    // Sort by date descending, then by ID descending
+    settings.sort((a, b) => {
+        const d1 = new Date(a.effectiveDate);
+        const d2 = new Date(b.effectiveDate);
+        if (d1.getTime() !== d2.getTime()) return d2 - d1;
+        return (b.id || 0) - (a.id || 0);
+    });
 
     // Find the first setting where effectiveDate <= date
     const effective = settings.find(s => s.effectiveDate <= date);
-    return effective ? effective.amount : settings[settings.length - 1].amount; // Return oldest if none found <= date
+    if (effective) return effective.amount;
+
+    // If no setting found <= date, it means the date is BEFORE all our records.
+    // Return the hardcoded default for that type.
+    if (type === 'ඇතුලත්වීමේ ගාස්තු ලැබීම්') return 13000;
+    if (type === 'මාසික සාමාජික මුදල් ලැබීම්') return 300;
+    if (type === 'සුභ සාධක අරමුදල් ලැබීම්') return 200;
+
+    return settings[settings.length - 1].amount; // Fallback to oldest if defaults not matched
 };
 
 // System Backup Functionality
@@ -307,43 +326,46 @@ window.importSystemData = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    if (!confirm("This will completely replace your current data with the backup file. Are you sure you want to continue?")) {
-        event.target.value = '';
-        return;
-    }
-
-    try {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
+    window.utils.showConfirm(
+        "Restore Data?", 
+        "This will completely replace your current data with the backup file. Are you sure you want to continue?",
+        async () => {
             try {
-                const data = JSON.parse(e.target.result);
-                
-                // Simple validation check
-                if (!data.members || !data.accounts || !data.transactions) {
-                    throw new Error("Invalid backup file format.");
-                }
-
-                await db.transaction('rw', db.tables, async () => {
-                    for (const table of db.tables) {
-                        if (data[table.name]) {
-                            await table.clear();
-                            await table.bulkAdd(data[table.name]);
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        
+                        // Simple validation check
+                        if (!data.members || !data.accounts || !data.transactions) {
+                            throw new Error("Invalid backup file format.");
                         }
-                    }
-                });
 
-                window.utils.showToast("System restored successfully! Reloading...");
-                setTimeout(() => window.location.reload(), 1500);
+                        await db.transaction('rw', db.tables, async () => {
+                            for (const table of db.tables) {
+                                if (data[table.name]) {
+                                    await table.clear();
+                                    await table.bulkAdd(data[table.name]);
+                                }
+                            }
+                        });
+
+                        window.utils.showToast("System restored successfully! Reloading...");
+                        setTimeout(() => window.location.reload(), 1500);
+                    } catch (err) {
+                        console.error("Import error:", err);
+                        window.utils.showToast("Error processing backup file: " + err.message, "error");
+                        event.target.value = '';
+                    }
+                };
+                reader.readAsText(file);
             } catch (err) {
-                console.error("Import error:", err);
-                window.utils.showToast("Error processing backup file: " + err.message, "error");
+                console.error("File read error:", err);
+                window.utils.showToast("Failed to read the backup file.", "error");
                 event.target.value = '';
             }
-        };
-        reader.readAsText(file);
-    } catch (err) {
-        console.error("File read error:", err);
-        window.utils.showToast("Failed to read the backup file.", "error");
-        event.target.value = '';
-    }
+        },
+        "Confirm Restore",
+        "warning"
+    );
 };

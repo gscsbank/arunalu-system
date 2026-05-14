@@ -143,6 +143,9 @@ window.generateReport = async () => {
     const entries = await db.entries.toArray();
     const members = await db.members.toArray();
     const funerals = await db.funerals.toArray();
+    const users = await db.users.toArray();
+
+    // ... (rest of the code omitted for brevity in thought, but I will include it in the tool call)
 
     // Context up to End Date - FILTERED BY UNIT
     const sapCashAccounts = ['SAP මුදල් පොත', 'සිතුමිණ තැන්පත් ගිණුම'];
@@ -681,7 +684,6 @@ window.generateReport = async () => {
         `;
     } else if (type === 'receipt_book') {
         const receiptTxs = validTxsPeriod.filter(t => t.type === 'Receipt').sort((a, b) => {
-            // Sort by reference (AR000001...)
             return (a.reference || '').localeCompare(b.reference || '', undefined, { numeric: true });
         });
 
@@ -702,6 +704,9 @@ window.generateReport = async () => {
                 memberName = tx.otherName;
             }
 
+            const user = users.find(u => u.id === tx.userId);
+            const userName = user ? user.name : '-';
+
             const breakdown = credits.map(e => {
                 const acc = accounts.find(a => a.id === e.accountId);
                 return `<div class="text-[9px] text-gray-600 flex justify-between">
@@ -720,6 +725,7 @@ window.generateReport = async () => {
                     <td class="py-3 px-2 text-[10px] font-bold">${memberName}</td>
                     <td class="py-3 px-2">${breakdown}</td>
                     <td class="py-3 px-2 text-right font-black text-[11px] ${isCan ? 'text-red-400' : ''}">${formatCurrency(totalAmount)}</td>
+                    <td class="py-3 px-2 text-center text-[9px] font-bold text-gray-500 uppercase">${userName}</td>
                 </tr>
             `;
         }
@@ -733,15 +739,17 @@ window.generateReport = async () => {
                         <th class="py-3 px-2 w-48">සාමාජිකයා / නම</th>
                         <th class="py-3 px-2">විස්තරය (Breakdown)</th>
                         <th class="py-3 px-2 text-right w-32">මුළු මුදල (Rs)</th>
+                        <th class="py-3 px-2 text-center w-24">පරිශීලක (USER)</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${rowsHtml || '<tr><td colspan="5" class="py-12 text-center text-gray-400 italic">මෙම කාල සීමාව තුළ ලැබීම් (Receipts) දත්ත නැත</td></tr>'}
+                    ${rowsHtml || '<tr><td colspan="6" class="py-12 text-center text-gray-400 italic">මෙම කාල සීමාව තුළ ලැබීම් (Receipts) දත්ත නැත</td></tr>'}
                 </tbody>
                 <tfoot>
                     <tr class="border-t-2 border-b-4 border-gray-900 font-black bg-gray-50">
                         <td colspan="4" class="py-3 px-2 text-right uppercase text-xs">මුළු ලැබීම් එකතුව (Grand Total Receipts):</td>
                         <td class="py-3 px-2 text-right text-sm underline decoration-double">${formatCurrency(grandTotal)}</td>
+                        <td></td>
                     </tr>
                 </tfoot>
             </table>
@@ -918,8 +926,10 @@ window.triggerReportPrint = () => {
             <style>
                 @media print {
                     @page { size: A4 portrait; margin: 12mm 12mm 12mm 25mm; }
-                    body { background: white !important; color: black !important; font-family: 'Inter', 'Iskoola Pota', sans-serif !important; }
+                    html, body { background: white !important; color: black !important; font-family: 'Inter', 'Iskoola Pota', sans-serif !important; width: 210mm !important; margin: 0 !important; padding: 0 !important; }
                     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    
+                    #printArea { width: 210mm !important; margin: 0 !important; padding: 0 !important; }
                     
                     /* Reset colors for BW print */
                     .text-gray-400, .text-gray-500 { color: #666 !important; }

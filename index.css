@@ -142,18 +142,15 @@ h4 {
 }
 
 /* Print */
+/* Print Reset */
 @media print {
     @page {
-        size: 55mm auto;
         margin: 0;
     }
 
     html, body {
-        width: 55mm !important;
         margin: 0 !important;
         padding: 0 !important;
-        overflow: hidden !important;
-        height: auto !important;
         background: white;
     }
 
@@ -167,12 +164,10 @@ h4 {
 
     #printArea {
         display: block !important;
-        width: 55mm !important;
-        margin: 0 !important;
-        padding: 0 !important;
         position: absolute;
         top: 0;
         left: 0;
+        width: 100%;
     }
 
     #app-content, 

@@ -27,6 +27,12 @@ window.auth = {
         return false;
     },
 
+    async verifyAdmin(password) {
+        const admin = await db.users.where('role').equals('Admin').toArray();
+        const matched = admin.find(u => u.password === password);
+        return !!matched;
+    },
+
     logout() {
         this.session = null;
         localStorage.removeItem('arunalu_session');
