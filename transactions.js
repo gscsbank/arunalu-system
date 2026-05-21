@@ -212,10 +212,11 @@ window.handleCbAccountChange = async (accountId, type) => {
     const refInput = document.getElementById('txRef');
     if (!refInput) return;
 
-    if (isMain && type === 'Receipt') {
+    if (isMain && (type === 'Receipt' || type === 'Payment')) {
+        const prefix = type === 'Receipt' ? 'AR' : 'PV';
         const id = parseInt(accountId);
         if (isNaN(id)) {
-            if (/^AR\d+$/.test(refInput.value)) {
+            if (new RegExp('^' + prefix + '\\d+$').test(refInput.value)) {
                 refInput.value = '';
             }
             refInput.readOnly = false;
@@ -227,14 +228,14 @@ window.handleCbAccountChange = async (accountId, type) => {
 
         const account = await db.accounts.get(id);
         if (account && account.accountName === 'අරුණළු මුදල් පොත') {
-            const nextRef = await window.getNextReferenceNumber('AR');
+            const nextRef = await window.getNextReferenceNumber(prefix);
             refInput.value = nextRef;
             refInput.readOnly = true;
             refInput.classList.remove('bg-white', 'cursor-text');
             refInput.classList.add('bg-gray-100', 'cursor-not-allowed');
             refInput.placeholder = '';
         } else {
-            if (/^AR\d+$/.test(refInput.value)) {
+            if (new RegExp('^' + prefix + '\\d+$').test(refInput.value)) {
                 refInput.value = '';
             }
             refInput.readOnly = false;
@@ -276,7 +277,7 @@ window.openTransactionModal = async (type) => {
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Reference No</label>
-                    <input type="text" id="txRef" ${(window.currentUnit === 'Main' && type !== 'Receipt') ? 'readonly' : ''} class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 outline-none transition-all font-bold text-brand-600 ${(window.currentUnit === 'Main' && type !== 'Receipt') ? 'bg-gray-100 cursor-not-allowed' : 'bg-white cursor-text'}" placeholder="e.g. AR000001">
+                    <input type="text" id="txRef" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 outline-none transition-all font-bold text-brand-600 bg-white cursor-text" placeholder="e.g. AR000001">
                 </div>
             </div>
             
@@ -343,16 +344,11 @@ window.openTransactionModal = async (type) => {
         const refInput = document.getElementById('txRef');
         
         if (refInput) {
-            if (isMain && type === 'Receipt') {
-                refInput.value = '';
-                refInput.placeholder = "Enter Reference Number";
-            } else if (isMain) {
-                const nextRef = await window.getNextReferenceNumber(prefix);
-                refInput.value = nextRef;
-            } else {
-                refInput.value = '';
-                refInput.placeholder = "Enter Reference Number";
-            }
+            refInput.value = '';
+            refInput.placeholder = "Enter Reference Number";
+            refInput.readOnly = false;
+            refInput.classList.remove('bg-gray-100', 'cursor-not-allowed');
+            refInput.classList.add('bg-white', 'cursor-text');
         }
 
         if (type === 'Receipt') {
