@@ -170,9 +170,13 @@ window.generateReport = async () => {
     let entriesEnd = entries.filter(e => validTxIdsEnd.has(e.transactionId));
 
     // Context Strictly Period Between
+    // NOTE: OP-BAL transactions are always excluded from period entries — they only
+    // contribute to the opening balance and must never be listed as income/expense.
     let validTxsPeriod = validTxsEnd;
     if (startDate) {
-        validTxsPeriod = validTxsEnd.filter(t => t.date >= startDate);
+        validTxsPeriod = validTxsEnd.filter(t => t.date >= startDate && t.reference !== 'OP-BAL');
+    } else {
+        validTxsPeriod = validTxsEnd.filter(t => t.reference !== 'OP-BAL');
     }
     const validTxIdsPeriod = new Set(validTxsPeriod.map(t => t.id));
     
@@ -292,7 +296,12 @@ window.generateReport = async () => {
         const netIncome = totalIncome - totalExpense;
 
         // Calculate Cash Reconciliation (Valid Assets only)
-        const validTxIdsBefore = new Set(validTxsEnd.filter(t => startDate ? t.date < startDate : false).map(t => t.id));
+        // KEY FIX: OP-BAL transactions must ALWAYS be included in "before" set even
+        // when their date equals startDate (strict < would exclude them incorrectly).
+        const validTxIdsBefore = new Set(validTxsEnd.filter(t => {
+            if (t.reference === 'OP-BAL') return true;   // always treat as "before"
+            return startDate ? t.date < startDate : false;
+        }).map(t => t.id));
         const entriesBefore = entries.filter(e => validTxIdsBefore.has(e.transactionId));
 
         let openingCash = 0;
@@ -308,7 +317,9 @@ window.generateReport = async () => {
             if (isMainUnit && sapCashAccountIds.has(acc.id)) {
                 const sapBefore = entries.filter(e => {
                     const tx = allTxsEnd.find(t => t.id === e.transactionId);
-                    return tx && tx.status !== 'Cancelled' && tx.unit === 'SAP' && e.accountId === acc.id && tx.date < (startDate || '1970-01-01');
+                    // Same fix: OP-BAL always counts as "before"
+                    return tx && tx.status !== 'Cancelled' && tx.unit === 'SAP' && e.accountId === acc.id
+                        && (tx.reference === 'OP-BAL' || tx.date < (startDate || '1970-01-01'));
                 });
                 oCash += sapBefore.reduce((sum, e) => sum + (parseFloat(e.debit) || 0) - (parseFloat(e.credit) || 0), 0);
 
@@ -760,10 +771,12 @@ window.generateReport = async () => {
         if (!account) return;
 
         // Opening Balance (before StartDate)
+        // KEY FIX: OP-BAL entries must always be included as opening balance even
+        // when tx.date === startDate (strict < would wrongly exclude them).
         let openingBal = 0;
         const entriesBefore = entries.filter(e => {
             const tx = validTxsEnd.find(t => t.id === e.transactionId);
-            return tx && tx.date < startDate && e.accountId === accountId;
+            return tx && (tx.reference === 'OP-BAL' || tx.date < startDate) && e.accountId === accountId;
         });
 
         entriesBefore.forEach(e => {
@@ -1002,9 +1015,25 @@ async function generateMonthlyBook() {
         entriesEnd = [...entriesEnd, ...extraSapEntries];
     }
 
-    const validTxsPeriod = validTxsEnd.filter(t => t.date >= startDate);
+    // Exclude OP-BAL from period — same fix as standalone PNL
+    const validTxsPeriod = validTxsEnd.filter(t => t.date >= startDate && t.reference !== 'OP-BAL');
     const validTxIdsPeriod = new Set(validTxsPeriod.map(t => t.id));
     const entriesPeriod = entries.filter(e => validTxIdsPeriod.has(e.transactionId));
+
+    // Opening / Closing cash for PNL reconciliation (mirrors standalone PNL logic)
+    const mbTxIdsBefore = new Set(validTxsEnd.filter(t => {
+        if (t.reference === 'OP-BAL') return true;
+        return t.date < startDate;
+    }).map(t => t.id));
+    const mbEntriesBefore = entries.filter(e => mbTxIdsBefore.has(e.transactionId));
+    let mbOpeningCash = 0;
+    let mbClosingCash = 0;
+    accounts.filter(a => a.accountType === 'Asset').forEach(acc => {
+        const eb = mbEntriesBefore.filter(e => e.accountId === acc.id);
+        mbOpeningCash += eb.reduce((s, e) => s + (parseFloat(e.debit) || 0) - (parseFloat(e.credit) || 0), 0);
+        const ee = entriesEnd.filter(e => e.accountId === acc.id);
+        mbClosingCash += ee.reduce((s, e) => s + (parseFloat(e.debit) || 0) - (parseFloat(e.credit) || 0), 0);
+    });
 
     const pageBreak = '<div style="page-break-after: always;"></div>';
     const sectionHeader = (title) => `<div class="mb-5 border-b-2 border-black pb-4 text-center">
@@ -1045,7 +1074,7 @@ async function generateMonthlyBook() {
     if(acc.accountType==='Income'){const b=c-d;if(b!==0){tInc+=b;incH+=`<tr><td class="py-1.5 pl-6 text-sm">${acc.accountName}</td><td class="py-1.5 text-right text-sm">${formatCurrency(b)}</td></tr>`;}}
     else{const b=d-c;if(b!==0){tExp+=b;expH+=`<tr><td class="py-1.5 pl-6 text-sm">${acc.accountName}</td><td class="py-1.5 text-right text-sm">${formatCurrency(b)}</td></tr>`;}}}
     const netInc=tInc-tExp;
-    const pnlPage = sectionHeader('ලැබීම් හා ගෙවීම් ප්‍රකාශනය (Receipts & Payments Statement)') + `<table class="w-full text-left border-collapse mb-8 border border-gray-200"><thead class="bg-gray-100 border-b-2 border-gray-800"><tr><th class="py-3 px-4 font-bold">විස්තරය</th><th class="py-3 px-4 font-bold text-right">මුදල (Rs)</th></tr></thead><tbody><tr class="border-b border-gray-300 bg-gray-50"><td colspan="2" class="py-2 px-4 font-bold">ලැබීම් (Receipts)</td></tr>${incH||'<tr><td colspan="2" class="py-2 pl-8 text-sm text-gray-400">දත්ත නැත</td></tr>'}<tr class="font-bold border-t border-gray-300"><td class="py-2 pl-6">මුළු ලැබීම්</td><td class="py-2 text-right pr-4">${formatCurrency(tInc)}</td></tr><tr><td colspan="2" class="py-4"></td></tr><tr class="border-b border-gray-300 border-t bg-gray-50"><td colspan="2" class="py-2 px-4 font-bold">ගෙවීම් (Payments)</td></tr>${expH||'<tr><td colspan="2" class="py-2 pl-8 text-sm text-gray-400">දත්ත නැත</td></tr>'}<tr class="font-bold border-t border-gray-300"><td class="py-2 pl-6">මුළු ගෙවීම්</td><td class="py-2 text-right pr-4">${formatCurrency(tExp)}</td></tr></tbody><tfoot><tr class="border-t-2 border-b-2 border-gray-800 font-bold bg-gray-100"><td class="py-4 pl-4 text-lg uppercase tracking-tighter font-black">අතිරික්තය / (ඌණතාවය)</td><td class="py-4 text-right pr-4 text-lg">${formatCurrency(netInc)}</td></tr></tfoot></table>`;
+    const pnlPage = sectionHeader('ලැබීම් හා ගෙවීම් ප්‍රකාශනය (Receipts & Payments Statement)') + `<table class="w-full text-left border-collapse mb-8 border border-gray-200"><thead class="bg-gray-100 border-b-2 border-gray-800"><tr><th class="py-3 px-4 font-bold">විස්තරය</th><th class="py-3 px-4 font-bold text-right">මුදල (Rs)</th></tr></thead><tbody><tr class="border-b border-gray-300 bg-gray-50"><td colspan="2" class="py-2 px-4 font-bold">ලැබීම් (Receipts)</td></tr>${incH||'<tr><td colspan="2" class="py-2 pl-8 text-sm text-gray-400">දත්ත නැත</td></tr>'}<tr class="font-bold border-t border-gray-300"><td class="py-2 pl-6">මුළු ලැබීම්</td><td class="py-2 text-right pr-4">${formatCurrency(tInc)}</td></tr><tr><td colspan="2" class="py-4"></td></tr><tr class="border-b border-gray-300 border-t bg-gray-50"><td colspan="2" class="py-2 px-4 font-bold">ගෙවීම් (Payments)</td></tr>${expH||'<tr><td colspan="2" class="py-2 pl-8 text-sm text-gray-400">දත්ත නැත</td></tr>'}<tr class="font-bold border-t border-gray-300"><td class="py-2 pl-6">මුළු ගෙවීම්</td><td class="py-2 text-right pr-4">${formatCurrency(tExp)}</td></tr></tbody><tfoot><tr class="border-t-2 border-b-2 border-gray-800 font-bold bg-gray-100"><td class="py-4 pl-4 text-lg uppercase tracking-tighter font-black">එම කාලය තුළ අතිරික්තය / (ඌණතාවය)</td><td class="py-4 text-right pr-4 text-lg">${formatCurrency(netInc)}</td></tr><tr class="border-t border-gray-200 italic text-gray-600"><td class="py-2 pl-4 text-sm font-medium">කාලච්ඡේදය ආරම්භයේ මුදල් ශේෂය (Opening Balance)</td><td class="py-2 text-right pr-4 text-sm font-medium">${formatCurrency(mbOpeningCash)}</td></tr><tr class="border-t-2 border-b-4 border-gray-900 bg-gray-50 text-gray-900"><td class="py-3 pl-4 text-sm font-black uppercase tracking-tight">කාලච්ඡේදය අවසානයේ මුදල් ශේෂය (Closing Balance)</td><td class="py-3 text-right pr-4 text-sm font-black">${formatCurrency(mbClosingCash)}</td></tr></tfoot></table>`;
 
     // === BALANCE SHEET ===
     let tA=0,aR='',tL=0,lR='',tEq=0,eR='',nP=0;
