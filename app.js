@@ -184,8 +184,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return bal;
         };
 
-        const welfareBal = await getBal('සුභ සාධක අරමුදල්');
-        const funeralBal = await getBal('මරණාධාර');
+        const welfareBal = await getBal('මාසික සාමාජික');
+        const funeralBal = await getBal('සුභ සාධක අරමුදල්');
         const sapCashBal = await getBal('SAP මුදල් පොත');
         const sithuminaBal = await getBal('සිතුමිණ තැන්පත්');
 
@@ -231,7 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
             { label: 'පද්ධති තත්ත්වය', value: 'ACTIVE', icon: 'fa-shield-halved', color: 'slate', sub: 'System Secure' }
         ] : [
             { label: 'මුළු සාමාජිකයින්', value: memberCount, icon: 'fa-users', color: 'blue', sub: 'Active Members', isCount: true },
-            { label: 'සුභසාධක අරමුදල', value: welfareBal, icon: 'fa-hand-holding-heart', color: 'emerald', sub: 'Welfare Fund' },
+            { label: 'මාසික සාමාජික මුදල්', value: welfareBal, icon: 'fa-hand-holding-heart', color: 'emerald', sub: 'Monthly Membership' },
             { label: 'මරණාධාර අරමුදල', value: funeralBal, icon: 'fa-heart-pulse', color: 'rose', sub: 'Funeral Fund' },
             { label: 'පද්ධති තත්ත්වය', value: 'ONLINE', icon: 'fa-cloud', color: 'slate', sub: 'V2.1 Enterprise' }
         ];

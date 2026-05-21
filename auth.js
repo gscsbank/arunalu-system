@@ -54,10 +54,7 @@ window.auth = {
                                 <div class="text-[10px] text-brand-600 font-black uppercase tracking-[0.15em] mt-0.5">${this.session.role}</div>
                             </div>
                         </div>
-                        <div class="mt-4 pt-4 border-t border-gray-100 space-y-3">
-                            <button onclick="window.backupModule.handleBackupFlow()" class="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 py-2.5 rounded-xl font-bold transition-all border border-emerald-100 flex items-center justify-center gap-2 text-[10px] uppercase tracking-wider shadow-sm">
-                                <i class="fa-solid fa-shield-halved"></i> Secure Backup
-                            </button>
+                        <div class="mt-4 pt-4 border-t border-gray-100">
                             <div class="flex justify-between items-center">
                                 <div class="flex items-center gap-2">
                                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
