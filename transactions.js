@@ -207,6 +207,44 @@ window.calculateTxTotal = () => {
     if (totalEl) totalEl.textContent = total.toFixed(2);
 };
 
+window.handleCbAccountChange = async (accountId, type) => {
+    const isMain = window.currentUnit === 'Main';
+    const refInput = document.getElementById('txRef');
+    if (!refInput) return;
+
+    if (isMain && type === 'Receipt') {
+        const id = parseInt(accountId);
+        if (isNaN(id)) {
+            if (/^AR\d+$/.test(refInput.value)) {
+                refInput.value = '';
+            }
+            refInput.readOnly = false;
+            refInput.classList.remove('bg-gray-100', 'cursor-not-allowed');
+            refInput.classList.add('bg-white', 'cursor-text');
+            refInput.placeholder = 'Enter Reference Number';
+            return;
+        }
+
+        const account = await db.accounts.get(id);
+        if (account && account.accountName === 'අරුණළු මුදල් පොත') {
+            const nextRef = await window.getNextReferenceNumber('AR');
+            refInput.value = nextRef;
+            refInput.readOnly = true;
+            refInput.classList.remove('bg-white', 'cursor-text');
+            refInput.classList.add('bg-gray-100', 'cursor-not-allowed');
+            refInput.placeholder = '';
+        } else {
+            if (/^AR\d+$/.test(refInput.value)) {
+                refInput.value = '';
+            }
+            refInput.readOnly = false;
+            refInput.classList.remove('bg-gray-100', 'cursor-not-allowed');
+            refInput.classList.add('bg-white', 'cursor-text');
+            refInput.placeholder = 'Enter Reference Number';
+        }
+    }
+};
+
 window.openTransactionModal = async (type) => {
     // type is 'Receipt' or 'Payment'
     const accounts = (await db.accounts.toArray()).filter(a => (a.unit || 'Main') === window.currentUnit);
@@ -238,7 +276,7 @@ window.openTransactionModal = async (type) => {
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Reference No</label>
-                    <input type="text" id="txRef" ${window.currentUnit === 'Main' ? 'readonly' : ''} class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 outline-none transition-all font-bold text-brand-600 ${window.currentUnit === 'Main' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white cursor-text'}" placeholder="e.g. AR000001">
+                    <input type="text" id="txRef" ${(window.currentUnit === 'Main' && type !== 'Receipt') ? 'readonly' : ''} class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 outline-none transition-all font-bold text-brand-600 ${(window.currentUnit === 'Main' && type !== 'Receipt') ? 'bg-gray-100 cursor-not-allowed' : 'bg-white cursor-text'}" placeholder="e.g. AR000001">
                 </div>
             </div>
             
@@ -254,7 +292,7 @@ window.openTransactionModal = async (type) => {
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">${type === 'Receipt' ? 'Deposit To' : 'Pay From'} (Asset) <span class="text-red-500">*</span></label>
-                    <select id="cbAccount" required class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all bg-white">
+                    <select id="cbAccount" required onchange="window.handleCbAccountChange(this.value, '${type}')" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all bg-white">
                         <option value="" disabled selected>Select Account</option>
                         ${cbOptions}
                     </select>
@@ -302,11 +340,19 @@ window.openTransactionModal = async (type) => {
     requestAnimationFrame(async () => {
         const prefix = type === 'Receipt' ? 'AR' : 'PV';
         const isMain = window.currentUnit === 'Main';
-        const nextRef = isMain ? await window.getNextReferenceNumber(prefix) : '';
         const refInput = document.getElementById('txRef');
+        
         if (refInput) {
-            refInput.value = nextRef;
-            if (!isMain) refInput.placeholder = "Enter Reference Number";
+            if (isMain && type === 'Receipt') {
+                refInput.value = '';
+                refInput.placeholder = "Enter Reference Number";
+            } else if (isMain) {
+                const nextRef = await window.getNextReferenceNumber(prefix);
+                refInput.value = nextRef;
+            } else {
+                refInput.value = '';
+                refInput.placeholder = "Enter Reference Number";
+            }
         }
 
         if (type === 'Receipt') {
