@@ -100,6 +100,35 @@ async function initDefaultAccounts() {
             console.log("Opening balance set for සණස බාහිර තැන්පතු ගිණුම");
         }
     }
+
+    // Set specific opening balance for Sithumina Deposit Account (SAP Center) as requested
+    const sithuminaAcc = await db.accounts.where('accountName').equalsIgnoreCase('සිතුමිණ තැන්පත් ගිණුම').first();
+    if (sithuminaAcc) {
+        const sithuminaEntryCount = await db.entries.where('accountId').equals(sithuminaAcc.id).count();
+        if (sithuminaEntryCount === 0) {
+            let eqAcc2 = await db.accounts.where('accountName').equalsIgnoreCase('Opening Balance Equity').first();
+            if (!eqAcc2) {
+                const eqId2 = await db.accounts.add({ accountName: 'Opening Balance Equity', accountType: 'Equity', category: 'System Settings' });
+                eqAcc2 = { id: eqId2 };
+            }
+
+            const txId2 = await db.transactions.add({
+                date: '2026-05-01',
+                type: 'Transfer',
+                reference: 'OP-BAL',
+                description: `Opening Balance for ${sithuminaAcc.accountName}`,
+                status: 'Completed',
+                userId: 1,
+                unit: 'SAP'
+            });
+
+            await db.entries.bulkAdd([
+                { transactionId: txId2, accountId: sithuminaAcc.id, debit: 61663.15, credit: 0 },
+                { transactionId: txId2, accountId: eqAcc2.id, debit: 0, credit: 61663.15 }
+            ]);
+            console.log("Opening balance set for සිතුමිණ තැන්පත් ගිණුම");
+        }
+    }
 }
 
 // Subscribe to readiness
