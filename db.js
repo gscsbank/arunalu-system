@@ -135,6 +135,38 @@ async function initDefaultAccounts() {
 db.on('ready', async () => {
     await initDefaultAccounts();
     
+    // Migration: Convert "B.S.Thilina Prasad" from Other to a proper SAP member
+    const targetCleanName = 'B.S.Thilina Prasad';
+    const otherTxs = await db.transactions.filter(t => 
+        t.otherName && 
+        (t.otherName.includes('Thilina') || t.otherName.includes('Prasad'))
+    ).toArray();
+    
+    if (otherTxs.length > 0) {
+        // Check if member already exists in SAP unit
+        let member = await db.members.filter(m => m.name === targetCleanName && (m.unit || 'Main') === 'SAP').first();
+        if (!member) {
+            const newId = await db.members.add({
+                memberNo: '',
+                name: targetCleanName,
+                nic: '',
+                phone: '',
+                joinedDate: new Date().toISOString().split('T')[0],
+                address: '',
+                unit: 'SAP',
+                shopName: '',
+                nominees: []
+            });
+            member = { id: newId };
+            console.log(`Created SAP member: ${targetCleanName} (ID: ${newId})`);
+        }
+        // Link all matching transactions to this member
+        for (const t of otherTxs) {
+            await db.transactions.update(t.id, { memberId: member.id, otherName: null });
+        }
+        console.log(`Linked ${otherTxs.length} transaction(s) to member ${targetCleanName}`);
+    }
+
     // Temporary auto-delete for AR000034
     const tx = await db.transactions.where('reference').equals('AR000034').first();
     if (tx) {

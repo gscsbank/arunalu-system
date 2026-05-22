@@ -179,8 +179,8 @@ window.viewMemberProfile = async (id) => {
             Member Profile
         </h3>
         
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div class="bg-gray-50 rounded-xl p-4 md:p-5 border border-gray-100 shadow-sm md:col-span-2">
+        <div class="grid grid-cols-1 ${member.unit === 'SAP' ? '' : 'md:grid-cols-3'} gap-4 mb-6">
+            <div class="bg-gray-50 rounded-xl p-4 md:p-5 border border-gray-100 shadow-sm ${member.unit === 'SAP' ? 'col-span-1' : 'md:col-span-2'}">
                 <h4 class="text-sm font-black text-brand-600 mb-4 uppercase tracking-widest border-b border-gray-200 pb-2">${member.unit === 'SAP' ? 'Tenant / Shop Info' : 'About Member'}</h4>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
                     <p class="flex flex-col sm:flex-row sm:items-center"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">${member.unit === 'SAP' ? 'ID / No:' : 'Member No:'}</span> <span class="font-bold text-gray-800">${member.memberNo || '-'}</span></p>
@@ -192,6 +192,7 @@ window.viewMemberProfile = async (id) => {
                     <p class="flex flex-col sm:flex-row sm:items-start sm:col-span-2"><span class="text-gray-400 text-xs font-bold w-28 shrink-0 uppercase">Address:</span> <span class="font-bold text-gray-800">${member.address || '-'}</span></p>
                 </div>
             </div>
+            ${member.unit === 'SAP' ? '' : `
             <div class="bg-brand-900 rounded-xl p-5 border border-brand-800 shadow-xl text-white">
                  <div class="flex justify-between items-start mb-4">
                      <h4 class="text-xs font-black text-brand-300 uppercase tracking-widest flex items-center gap-2">
@@ -239,6 +240,7 @@ window.viewMemberProfile = async (id) => {
                     </button>
                  ` : ''))}
             </div>
+            `}
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 ${member.unit === 'SAP' ? 'hidden' : ''}">
@@ -556,11 +558,13 @@ window.saveMember = async (e, id) => {
             await db.members.update(id, payload);
             window.utils.showToast('Member updated successfully');
         } else {
-            // Check if member already exists by NIC or No
-            const existing = await db.members.where('memberNo').equals(payload.memberNo).or('nic').equals(payload.nic).first();
-            if (existing && existing.id !== id) {
-                window.utils.showToast('Member Number or NIC already exists!', 'error');
-                return;
+            // Check if member already exists by NIC or No (Skip in SAP Center Mode)
+            if (window.currentUnit !== 'SAP') {
+                const existing = await db.members.where('memberNo').equals(payload.memberNo).or('nic').equals(payload.nic).first();
+                if (existing && existing.id !== id) {
+                    window.utils.showToast('Member Number or NIC already exists!', 'error');
+                    return;
+                }
             }
             await db.members.add(payload);
             window.utils.showToast('Member added successfully');

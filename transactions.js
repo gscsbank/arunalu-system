@@ -732,12 +732,6 @@ window.printTransaction = async (id) => {
                                 <span style="font-size: 9px; font-weight: 800; margin-right: 2mm;">වවුචර අංකය:</span>
                                 <span style="font-size: 11px; font-weight: 900;">${tx.reference || '-'}</span>
                             </div>
-                            ${!isOriginal ? `
-                            <div style="display: flex; align-items: center; border: 1px solid #000; padding: 0.5mm 2mm;">
-                                <span style="font-size: 7px; font-weight: 800; margin-right: 1mm;">බැංකු මුදල් ලබාගැනීමේ අංකය:</span>
-                                <span style="width: 25mm; height: 3mm;"></span> <!-- Blank space for manual entry -->
-                            </div>
-                            ` : ''}
                         </div>
                         <div style="display: flex; align-items: center; border: 1px solid #000; padding: 0.5mm 2mm; height: fit-content;">
                             <span style="font-size: 9px; font-weight: 800; margin-right: 2mm;">දිනය:</span>
@@ -926,7 +920,7 @@ window.viewTransaction = async (id) => {
     }
 
     let arrearsSummary = '';
-    if (tx.memberId) {
+    if (tx.memberId && (tx.unit || 'Main') !== 'SAP' && window.currentUnit !== 'SAP') {
         const dues = await window.getMemberDues(tx.memberId, tx.date);
         const totalArrears = dues.entranceDue + dues.monthlyDue + dues.funeralDue;
         if (totalArrears > 0) {
