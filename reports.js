@@ -938,11 +938,11 @@ window.triggerReportPrint = () => {
         <div style="font-family: 'Inter', 'Iskoola Pota', sans-serif; color: black; width: 100%;">
             <style>
                 @media print {
-                    @page { size: A4 portrait; margin: 12mm 12mm 12mm 25mm; }
-                    html, body { background: white !important; color: black !important; font-family: 'Inter', 'Iskoola Pota', sans-serif !important; width: 210mm !important; margin: 0 !important; padding: 0 !important; }
+                    @page { size: A4 portrait; margin: 15mm 15mm 15mm 20mm; }
+                    html, body { background: white !important; color: black !important; font-family: 'Inter', 'Iskoola Pota', sans-serif !important; width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
                     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                     
-                    #printArea { width: 210mm !important; margin: 0 !important; padding: 0 !important; }
+                    #printArea { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
                     
                     /* Reset colors for BW print */
                     .text-gray-400, .text-gray-500 { color: #666 !important; }
@@ -951,7 +951,7 @@ window.triggerReportPrint = () => {
                     .text-white { color: white !important; }
                     .border-black { border-color: black !important; }
                     
-                    table { width: 100%; border-collapse: collapse; }
+                    table { width: 100% !important; border-collapse: collapse !important; margin-bottom: 15pt !important; }
                     th { padding: 6pt 5pt !important; font-size: 8.5pt !important; text-transform: uppercase !important; font-weight: 900 !important; text-align: left !important; border-bottom: 1.5pt solid black !important; }
                     td { padding: 5pt 5pt !important; font-size: 9.5pt !important; border-bottom: 0.4pt solid #ccc !important; }
                     tfoot tr td { border-top: 2pt solid black !important; border-bottom: 3pt double black !important; font-weight: 900 !important; font-size: 10pt !important; }
@@ -959,6 +959,11 @@ window.triggerReportPrint = () => {
                     .font-bold { font-weight: 800 !important; }
                     .pl-6 { padding-left: 18pt !important; }
                     .pl-8 { padding-left: 24pt !important; }
+                    
+                    /* Page Break Control */
+                    tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+                    h1, h2, h3, h4, h5, h6 { page-break-after: avoid !important; break-after: avoid !important; }
+                    .page-break-inside-avoid { page-break-inside: avoid !important; break-inside: avoid !important; }
                 }
             </style>
             
@@ -1043,7 +1048,7 @@ async function generateMonthlyBook() {
         <div class="inline-block px-2 py-0.5 bg-black text-white text-[8px] font-bold uppercase tracking-widest mt-1">කාල සීමාව: ${startDate} සිට ${endDate} දක්වා</div></div></div>`;
 
     // === COVER PAGE ===
-    const coverPage = `<div style="display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:90vh;text-align:center;">
+    const coverPage = `<div style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:245mm;box-sizing:border-box;text-align:center;">
         <div style="border:3px solid black;padding:60px 80px;max-width:500px;">
             <h1 style="font-size:28px;font-weight:900;text-transform:uppercase;letter-spacing:0.3em;margin:0;">${isMainUnit ? 'Arunalu' : 'SAP CENTER'}</h1>
             <h1 style="font-size:28px;font-weight:900;text-transform:uppercase;letter-spacing:0.3em;margin:0;">${isMainUnit ? 'Welfare Society' : 'ARUNALU WELFARE'}</h1>
@@ -1112,7 +1117,7 @@ async function generateMonthlyBook() {
     const fixedAssetsPage = sectionHeader('ස්ථාවර වත්කම් සාරාංශය (Fixed Assets)') + `<table class="w-full text-left border-collapse mb-8 border border-gray-200"><thead class="border-b-2 border-gray-800 bg-gray-50"><tr><th class="py-3 pl-4">ගිණුම් නාමය</th><th class="py-3 text-right pr-4">වටිනාකම (Rs)</th></tr></thead><tbody>${faR||'<tr><td colspan="2" class="py-8 text-center text-gray-400">දත්ත නැත</td></tr>'}</tbody><tfoot><tr class="border-t-2 border-b-4 border-gray-800 font-bold bg-gray-100 text-lg"><td class="py-4 pl-4">මුළු වටිනාකම</td><td class="py-4 text-right pr-4">${formatCurrency(faT)}</td></tr></tfoot></table>`;
 
     // === INTERNAL AUDIT PAGE ===
-    const auditPage = `<div style="display:flex;flex-direction:column;justify-content:center;min-height:85vh;text-align:center;">
+    const auditPage = `<div style="display:flex;flex-direction:column;justify-content:center;height:245mm;box-sizing:border-box;text-align:center;">
         <div style="border:2px solid black;padding:40px 50px;max-width:550px;margin:0 auto;">
             <h2 style="font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;margin-bottom:5px;">Internal Audit Verification</h2>
             <h3 style="font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:25px;">අභ්‍යන්තර විගණන සහතිකය</h3>

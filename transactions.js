@@ -26,9 +26,15 @@ async function renderTransactions() {
             </div>
             
             <!-- Quick Filters -->
-            <div class="mb-6 flex flex-wrap gap-2">
+            <div class="mb-6 flex flex-wrap gap-2 items-center">
                 <input type="date" id="txStartDate" class="flex-1 md:flex-none px-4 py-2 rounded-xl border border-gray-200 focus:border-brand-500 bg-white/50 text-sm">
                 <input type="date" id="txEndDate" class="flex-1 md:flex-none px-4 py-2 rounded-xl border border-gray-200 focus:border-brand-500 bg-white/50 text-sm">
+                <select id="txTypeFilter" onchange="loadTransactionsTable()" class="flex-1 md:flex-none px-4 py-2 rounded-xl border border-gray-200 focus:border-brand-500 bg-white/50 text-sm outline-none">
+                    <option value="All">All Types</option>
+                    <option value="Receipt">Receipts</option>
+                    <option value="Payment">Payments</option>
+                    <option value="Transfer">Transfers</option>
+                </select>
                 <button onclick="loadTransactionsTable()" class="w-full md:w-auto bg-brand-50 text-brand-600 px-6 py-2 rounded-xl border border-brand-100 hover:bg-brand-100 font-bold text-sm">Filter</button>
             </div>
 
@@ -77,6 +83,12 @@ async function loadTransactionsTable() {
     let transactions = await query.toArray();
     // Filter by Current Unit
     transactions = transactions.filter(t => (t.unit || 'Main') === window.currentUnit).reverse();
+
+    // Filter by Transaction Type if selected
+    const typeFilter = document.getElementById('txTypeFilter')?.value || 'All';
+    if (typeFilter !== 'All') {
+        transactions = transactions.filter(t => t.type === typeFilter);
+    }
 
     if (transactions.length === 0) {
         tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-gray-400">No transactions found.</td></tr>`;
