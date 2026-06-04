@@ -827,12 +827,12 @@ window.printTransaction = async (id) => {
             <style>
                 @media print {
                     @page { size: 55mm auto; margin: 0; }
-                    html, body { width: 55mm !important; margin: 0 !important; padding: 0 !important; overflow: hidden; }
-                    #printArea { width: 55mm !important; margin: 0 !important; padding: 0 !important; }
+                    html, body { width: 55mm !important; height: auto !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
+                    #printArea { width: 55mm !important; height: auto !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
                     .no-print { display: none !important; }
                 }
             </style>
-            <div style="width: 55mm; max-width: 55mm; margin: 0 auto; padding: 2mm; font-family: 'Inter', 'Iskoola Pota', sans-serif; font-size: 10px; line-height: 1.2; color: black; background: white;">
+            <div style="width: 55mm; max-width: 55mm; margin: 0 auto; padding: 2mm; font-family: 'Inter', 'Iskoola Pota', sans-serif; font-size: 10px; line-height: 1.2; color: black; background: white; box-sizing: border-box;">
                 
                 <div style="text-align: center; margin-bottom: 6px;">
                     <h1 style="font-size: 13px; font-weight: 900; margin: 0; line-height: 1.1; text-transform: uppercase;">${(tx.unit || 'Main') === 'SAP' ? 'SAP CENTER - ARUNALU' : 'Arunalu Welfare Society'}</h1>
@@ -882,7 +882,7 @@ window.printTransaction = async (id) => {
                 <div style="text-align: center; margin-top: 12px; font-size: 8px; font-weight: bold; border-top: 1px dashed #ccc; pt-2">
                     THANK YOU! - IRRASOFT SOLUTION
                 </div>
-                <div style="height: 10mm;"></div> <!-- Extra space for tearing -->
+                <div style="height: 50mm; display: flex; align-items: flex-end; justify-content: center; font-size: 4px; color: #eee; clear: both; box-sizing: border-box; padding-bottom: 2mm;">.</div>
             </div>
         `;
     }
