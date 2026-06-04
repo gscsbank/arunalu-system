@@ -113,15 +113,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const renderers = {
             'dashboard': renderDashboard,
-            'members': typeof renderMembers !== 'undefined' ? renderMembers : async () => `<div class="glass-panel p-6 rounded-2xl">Members under construction...</div>`,
-            'accounts': typeof renderAccounts !== 'undefined' ? renderAccounts : async () => `<div class="glass-panel p-6 rounded-2xl">Accounts under construction...</div>`,
-            'transactions': typeof renderTransactions !== 'undefined' ? renderTransactions : async () => `<div class="glass-panel p-6 rounded-2xl">Transactions under construction...</div>`,
-            'reports': typeof renderReports !== 'undefined' ? renderReports : async () => `<div class="glass-panel p-6 rounded-2xl">Reports under construction...</div>`,
-            'monthly_book': typeof renderMonthlyBook !== 'undefined' ? renderMonthlyBook : async () => `<div class="glass-panel p-6 rounded-2xl">Monthly Book under construction...</div>`,
-            'settings': typeof renderSettings !== 'undefined' ? renderSettings : async () => `<div class="glass-panel p-6 rounded-2xl">Settings under construction...</div>`,
+            'members': typeof window.renderMembers === 'function' ? window.renderMembers : async () => `<div class="glass-panel p-6 rounded-2xl">Members under construction...</div>`,
+            'accounts': typeof window.renderAccounts === 'function' ? window.renderAccounts : async () => `<div class="glass-panel p-6 rounded-2xl">Accounts under construction...</div>`,
+            'transactions': typeof window.renderTransactions === 'function' ? window.renderTransactions : async () => `<div class="glass-panel p-6 rounded-2xl">Transactions under construction...</div>`,
+            'reports': typeof window.renderReports === 'function' ? window.renderReports : async () => `<div class="glass-panel p-6 rounded-2xl">Reports under construction...</div>`,
+            'monthly_book': typeof window.renderMonthlyBook === 'function' ? window.renderMonthlyBook : async () => `<div class="glass-panel p-6 rounded-2xl">Monthly Book under construction...</div>`,
+            'settings': typeof window.renderSettings === 'function' ? window.renderSettings : async () => `<div class="glass-panel p-6 rounded-2xl">Settings under construction...</div>`,
+            'backup': typeof window.renderBackupView === 'function' ? window.renderBackupView : async () => `<div class="glass-panel p-6 rounded-2xl">Backup under construction...</div>`,
         };
 
-        const htmlContent = await renderers[view]();
+        console.log("Switching view to:", view, "Renderer function:", renderers[view]);
+
+        const renderer = renderers[view];
+        if (typeof renderer !== 'function') {
+            console.error(`Renderer for view "${view}" is not a function! Available renderers:`, Object.keys(renderers));
+            return;
+        }
+
+        const htmlContent = await renderer();
 
         // Apply fade animation
         contentArea.innerHTML = `<div class="fade-enter">${htmlContent}</div>`;
@@ -134,6 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'reports': typeof mountReports !== 'undefined' ? mountReports : () => { },
             'monthly_book': typeof mountMonthlyBook !== 'undefined' ? mountMonthlyBook : () => { },
             'settings': typeof mountSettings !== 'undefined' ? mountSettings : () => { },
+            'backup': typeof mountBackupView !== 'undefined' ? mountBackupView : () => { },
             'dashboard': mountDashboard
         };
 
