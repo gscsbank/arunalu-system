@@ -1398,7 +1398,9 @@ window.getMemberDues = async (memberId, asOfDate = null) => {
     const arrearsDue = Math.max(0, (member.openingArrears || 0) - arrearsPaid);
 
     // Membership Status Flags
-    const isInvalid = monthsBehind >= 6;
+    // isInvalid = TRUE only if BOTH: (1) 6+ months behind in time AND (2) actual monthly balance is outstanding
+    // If monthlyDue is 0 (fully paid up), never mark as terminated even if months elapsed >= 6
+    const isInvalid = monthsBehind >= 6 && monthlyDue > 0;
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     const isNewMember = joinDate > sixMonthsAgo;
