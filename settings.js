@@ -48,6 +48,7 @@ window.renderSettings = async () => {
                 <div class="flex gap-2 p-1 bg-gray-100 rounded-xl no-print">
                     <button onclick="window.switchSettingsTab('rates')" id="tab-rates" class="px-4 py-2 rounded-lg text-sm font-bold transition-all bg-white shadow-sm text-brand-600">Rates</button>
                     <button onclick="window.switchSettingsTab('users')" id="tab-users" class="px-4 py-2 rounded-lg text-sm font-bold transition-all text-gray-500 hover:text-gray-700">Users</button>
+                    <button onclick="window.switchSettingsTab('printer')" id="tab-printer" class="px-4 py-2 rounded-lg text-sm font-bold transition-all text-gray-500 hover:text-gray-700"><i class="fa-solid fa-print mr-1"></i>Printer</button>
                 </div>
             </div>
 
@@ -83,6 +84,120 @@ window.renderSettings = async () => {
                     </table>
                 </div>
             </div>
+
+            <!-- Printer Settings Tab -->
+            <div id="settings-printer-content" class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex-1 hidden animate-fade-in">
+                <h4 class="text-sm font-black text-gray-400 uppercase tracking-widest mb-6"><i class="fa-solid fa-print mr-2"></i>Printer Settings / Connection</h4>
+
+                <!-- Interface Selector -->
+                <div class="mb-6">
+                    <p class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Interface / සම්බන්ධතා ක්‍රමය</p>
+                    <div class="grid grid-cols-3 gap-3" id="printerInterfaceSelector">
+                        <button onclick="window.selectPrinterInterface('bluetooth')" id="iface-bluetooth"
+                            class="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-brand-500 bg-brand-50 text-brand-700 font-bold text-sm transition-all">
+                            <i class="fa-brands fa-bluetooth text-2xl"></i>
+                            Bluetooth
+                        </button>
+                        <button onclick="window.selectPrinterInterface('wifi')" id="iface-wifi"
+                            class="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-gray-200 bg-gray-50 text-gray-500 font-bold text-sm transition-all hover:border-brand-300">
+                            <i class="fa-solid fa-wifi text-2xl"></i>
+                            WiFi / LAN
+                        </button>
+                        <button onclick="window.selectPrinterInterface('browser')" id="iface-browser"
+                            class="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-gray-200 bg-gray-50 text-gray-500 font-bold text-sm transition-all hover:border-brand-300">
+                            <i class="fa-solid fa-print text-2xl"></i>
+                            Browser Print
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Bluetooth Panel -->
+                <div id="printer-panel-bluetooth" class="">
+                    <!-- iOS Warning -->
+                    <div class="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl flex gap-3" id="ios-bt-warning" style="display:none !important">
+                        <i class="fa-brands fa-apple text-amber-600 text-xl mt-0.5"></i>
+                        <div>
+                            <div class="font-bold text-amber-800 text-sm">iOS Bluetooth සීමාව</div>
+                            <div class="text-xs text-amber-700 mt-1">iPhone/iPad හි Safari browser Bluetooth printing support කරන්නේ නැහැ. MPT-II printer connect කිරීමට <strong>Chrome on Android</strong> හෝ <strong>WiFi/LAN</strong> interface use කරන්න.</div>
+                        </div>
+                    </div>
+
+                    <!-- Status Bar -->
+                    <div id="bt-status-bar" class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <div id="bt-status-dot" class="w-2.5 h-2.5 rounded-full bg-gray-300"></div>
+                            <span id="bt-status-text" class="text-xs font-bold text-gray-500">Not Connected</span>
+                        </div>
+                        <span id="bt-device-name" class="text-xs text-gray-400 font-medium">No printer selected</span>
+                    </div>
+
+                    <!-- Scan Button -->
+                    <button onclick="window.scanBluetoothPrinters()" id="bt-scan-btn"
+                        class="w-full mb-4 flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-brand-500/20 text-sm">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        Scan for Printers (Bluetooth)
+                    </button>
+
+                    <!-- Device List -->
+                    <div id="bt-device-list" class="space-y-2 mb-4"></div>
+
+                    <!-- Manual Name Entry -->
+                    <div class="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                        <p class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Manual Device Name (අතින් ඇතුල් කරන්න)</p>
+                        <div class="flex gap-2">
+                            <input type="text" id="bt-manual-name" placeholder="e.g. MPT-II" value=""
+                                class="flex-1 px-3 py-2 rounded-lg border border-gray-300 text-sm outline-none focus:border-brand-500">
+                            <button onclick="window.saveBtManualDevice()" class="bg-gray-700 hover:bg-gray-900 text-white px-4 py-2 rounded-lg font-bold text-xs transition-all">
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- WiFi Panel -->
+                <div id="printer-panel-wifi" class="hidden">
+                    <div class="p-4 bg-blue-50 border border-blue-200 rounded-xl mb-4 flex gap-3">
+                        <i class="fa-solid fa-circle-info text-blue-500 mt-0.5"></i>
+                        <div class="text-xs text-blue-700">Printer IP address ඇතුල් කරන්න. Printer සහ Device එකම WiFi network එකේ connect වෙලා ඉන්න ඕනෙ.</div>
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-widest">Printer IP Address</label>
+                            <input type="text" id="wifi-printer-ip" placeholder="e.g. 192.168.1.100"
+                                class="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:border-brand-500 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-widest">Port</label>
+                            <input type="number" id="wifi-printer-port" placeholder="9100" value="9100"
+                                class="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:border-brand-500 text-sm">
+                        </div>
+                        <button onclick="window.saveWifiPrinter()" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2.5 rounded-xl transition-all text-sm shadow-lg shadow-brand-500/20">
+                            <i class="fa-solid fa-floppy-disk mr-2"></i>Save WiFi Printer Settings
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Browser Print Panel -->
+                <div id="printer-panel-browser" class="hidden">
+                    <div class="p-4 bg-green-50 border border-green-200 rounded-xl flex gap-3">
+                        <i class="fa-solid fa-circle-check text-green-500 mt-0.5 text-lg"></i>
+                        <div>
+                            <div class="font-bold text-green-800 text-sm">Browser Print Mode</div>
+                            <div class="text-xs text-green-700 mt-1">Browser ගේ built-in print dialog use කරනවා. Printer PC/Mac ට connected (USB/Network) නම් මෙය use කරන්න. iOS iPhone ටත් හොඳින් work කරනවා.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Test Print & Save -->
+                <div class="mt-6 flex gap-3">
+                    <button onclick="window.testPrinterConnection()" class="flex-1 flex items-center justify-center gap-2 border-2 border-gray-200 hover:border-brand-400 text-gray-600 hover:text-brand-600 font-bold py-2.5 rounded-xl transition-all text-sm">
+                        <i class="fa-solid fa-vial"></i> Test Print
+                    </button>
+                    <button onclick="window.savePrinterSettings()" class="flex-1 flex items-center justify-center gap-2 bg-gray-800 hover:bg-black text-white font-bold py-2.5 rounded-xl transition-all text-sm shadow-lg">
+                        <i class="fa-solid fa-floppy-disk"></i> Save Settings
+                    </button>
+                </div>
+            </div>
         </div>
     `;
 };
@@ -90,13 +205,306 @@ window.renderSettings = async () => {
 window.switchSettingsTab = (tab) => {
     document.getElementById('settings-rates-content').classList.toggle('hidden', tab !== 'rates');
     document.getElementById('settings-users-content').classList.toggle('hidden', tab !== 'users');
+    document.getElementById('settings-printer-content').classList.toggle('hidden', tab !== 'printer');
 
-    document.getElementById('tab-rates').className = tab === 'rates' ? 'px-4 py-2 rounded-lg text-sm font-bold transition-all bg-white shadow-sm text-brand-600' : 'px-4 py-2 rounded-lg text-sm font-bold transition-all text-gray-500 hover:text-gray-700';
-    document.getElementById('tab-users').className = tab === 'users' ? 'px-4 py-2 rounded-lg text-sm font-bold transition-all bg-white shadow-sm text-brand-600' : 'px-4 py-2 rounded-lg text-sm font-bold transition-all text-gray-500 hover:text-gray-700';
+    const active = 'px-4 py-2 rounded-lg text-sm font-bold transition-all bg-white shadow-sm text-brand-600';
+    const inactive = 'px-4 py-2 rounded-lg text-sm font-bold transition-all text-gray-500 hover:text-gray-700';
+    document.getElementById('tab-rates').className = tab === 'rates' ? active : inactive;
+    document.getElementById('tab-users').className = tab === 'users' ? active : inactive;
+    document.getElementById('tab-printer').className = tab === 'printer' ? active : inactive;
+
+    if (tab === 'printer') window.initPrinterSettingsTab();
 };
 
 window.mountSettings = () => {
     // No initialization logic needed for rates and users tabs at the moment
+};
+
+// ─── PRINTER SETTINGS LOGIC ──────────────────────────────────────────────────
+
+// Holds the active Web Bluetooth device
+window._btPrinterDevice = null;
+window._btPrinterCharacteristic = null;
+
+window.initPrinterSettingsTab = () => {
+    const saved = window.getPrinterSettings();
+
+    // Detect iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const iosWarn = document.getElementById('ios-bt-warning');
+    if (iosWarn && isIOS) iosWarn.style.removeProperty('display');
+
+    // Restore interface
+    window.selectPrinterInterface(saved.interface || 'bluetooth', false);
+
+    // Restore WiFi fields
+    if (saved.wifiIp) {
+        const ipEl = document.getElementById('wifi-printer-ip');
+        if (ipEl) ipEl.value = saved.wifiIp;
+    }
+    if (saved.wifiPort) {
+        const portEl = document.getElementById('wifi-printer-port');
+        if (portEl) portEl.value = saved.wifiPort;
+    }
+
+    // Restore BT manual name
+    if (saved.btDeviceName) {
+        const nameEl = document.getElementById('bt-manual-name');
+        if (nameEl) nameEl.value = saved.btDeviceName;
+        window.updateBtStatus(saved.btConnected ? 'connected' : 'saved', saved.btDeviceName);
+    }
+
+    // Show already-connected device if active
+    if (window._btPrinterDevice && window._btPrinterDevice.gatt.connected) {
+        window.updateBtStatus('connected', window._btPrinterDevice.name);
+    }
+};
+
+window.selectPrinterInterface = (iface, save = true) => {
+    const panels = ['bluetooth', 'wifi', 'browser'];
+    panels.forEach(p => {
+        const panel = document.getElementById(`printer-panel-${p}`);
+        const btn = document.getElementById(`iface-${p}`);
+        if (!panel || !btn) return;
+        if (p === iface) {
+            panel.classList.remove('hidden');
+            btn.className = 'flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-brand-500 bg-brand-50 text-brand-700 font-bold text-sm transition-all';
+        } else {
+            panel.classList.add('hidden');
+            btn.className = 'flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-gray-200 bg-gray-50 text-gray-500 font-bold text-sm transition-all hover:border-brand-300';
+        }
+    });
+    if (save) {
+        const s = window.getPrinterSettings();
+        s.interface = iface;
+        window.savePrinterSettingsData(s);
+    }
+};
+
+window.updateBtStatus = (state, deviceName = '') => {
+    const dot = document.getElementById('bt-status-dot');
+    const text = document.getElementById('bt-status-text');
+    const nameEl = document.getElementById('bt-device-name');
+    if (!dot || !text) return;
+    if (state === 'connected') {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse';
+        text.textContent = 'Connected';
+        text.className = 'text-xs font-bold text-green-600';
+    } else if (state === 'scanning') {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping';
+        text.textContent = 'Scanning...';
+        text.className = 'text-xs font-bold text-amber-600';
+    } else if (state === 'saved') {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-blue-400';
+        text.textContent = 'Saved (Not Live Connected)';
+        text.className = 'text-xs font-bold text-blue-500';
+    } else {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-gray-300';
+        text.textContent = 'Not Connected';
+        text.className = 'text-xs font-bold text-gray-500';
+    }
+    if (nameEl) nameEl.textContent = deviceName || 'No printer selected';
+};
+
+window.scanBluetoothPrinters = async () => {
+    // Check Web Bluetooth API availability
+    if (!navigator.bluetooth) {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        if (isIOS) {
+            utils.showToast('iOS Safari does not support Web Bluetooth. Use WiFi or Browser Print mode.', 'error');
+        } else {
+            utils.showToast('Web Bluetooth not supported in this browser. Use Chrome/Edge.', 'error');
+        }
+        return;
+    }
+
+    const btn = document.getElementById('bt-scan-btn');
+    const list = document.getElementById('bt-device-list');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Scanning...'; }
+    window.updateBtStatus('scanning');
+    if (list) list.innerHTML = '';
+
+    try {
+        // Request any Bluetooth device - browser shows system picker
+        const device = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: [
+                '000018f0-0000-1000-8000-00805f9b34fb', // Generic printer service
+                '00001101-0000-1000-8000-00805f9b34fb', // SPP (Serial Port Profile)
+                '00001800-0000-1000-8000-00805f9b34fb', // Generic Access
+                'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Common BT printer
+            ]
+        });
+
+        if (device) {
+            window.connectBluetoothPrinter(device);
+        }
+    } catch (err) {
+        if (err.name !== 'NotFoundError') {
+            utils.showToast('Bluetooth scan failed: ' + err.message, 'error');
+        }
+        window.updateBtStatus('disconnected');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-magnifying-glass mr-2"></i>Scan for Printers (Bluetooth)'; }
+    }
+};
+
+window.connectBluetoothPrinter = async (device) => {
+    const list = document.getElementById('bt-device-list');
+    window.updateBtStatus('scanning', device.name || 'Unknown');
+
+    try {
+        utils.showToast(`Connecting to ${device.name || 'printer'}...`, 'info');
+        const server = await device.gatt.connect();
+        window._btPrinterDevice = device;
+
+        // Try to find a writable characteristic for printing
+        let characteristic = null;
+        const serviceUuids = [
+            '000018f0-0000-1000-8000-00805f9b34fb',
+            'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+            '00001101-0000-1000-8000-00805f9b34fb',
+        ];
+        for (const uuid of serviceUuids) {
+            try {
+                const service = await server.getPrimaryService(uuid);
+                const chars = await service.getCharacteristics();
+                characteristic = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
+                if (characteristic) break;
+            } catch (_) { /* try next */ }
+        }
+        window._btPrinterCharacteristic = characteristic;
+
+        const s = window.getPrinterSettings();
+        s.btDeviceName = device.name || 'Unknown';
+        s.btConnected = true;
+        s.interface = 'bluetooth';
+        window.savePrinterSettingsData(s);
+
+        window.updateBtStatus('connected', device.name || 'Unknown');
+        utils.showToast(`✅ Connected to ${device.name || 'printer'}!`, 'success');
+
+        // Show in device list
+        if (list) {
+            list.innerHTML = `
+                <div class="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-xl">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                            <i class="fa-brands fa-bluetooth text-green-600"></i>
+                        </div>
+                        <div>
+                            <div class="font-bold text-green-800 text-sm">${device.name || 'Unknown Device'}</div>
+                            <div class="text-[10px] text-green-600 uppercase font-bold">Connected</div>
+                        </div>
+                    </div>
+                    <button onclick="window.disconnectBtPrinter()" class="text-xs text-red-500 hover:text-red-700 font-bold px-3 py-1 rounded-lg bg-red-50 border border-red-100">
+                        Disconnect
+                    </button>
+                </div>`;
+        }
+
+        // Listen for disconnect
+        device.addEventListener('gattserverdisconnected', () => {
+            window._btPrinterDevice = null;
+            window._btPrinterCharacteristic = null;
+            window.updateBtStatus('disconnected');
+            utils.showToast('Printer disconnected.', 'error');
+            if (list) list.innerHTML = '';
+        });
+
+    } catch (err) {
+        utils.showToast('Connection failed: ' + err.message, 'error');
+        window.updateBtStatus('disconnected');
+    }
+};
+
+window.disconnectBtPrinter = async () => {
+    if (window._btPrinterDevice && window._btPrinterDevice.gatt.connected) {
+        await window._btPrinterDevice.gatt.disconnect();
+    }
+    window._btPrinterDevice = null;
+    window._btPrinterCharacteristic = null;
+    window.updateBtStatus('disconnected');
+    const list = document.getElementById('bt-device-list');
+    if (list) list.innerHTML = '';
+    utils.showToast('Disconnected from printer.', 'info');
+};
+
+window.saveBtManualDevice = () => {
+    const name = document.getElementById('bt-manual-name')?.value?.trim();
+    if (!name) { utils.showToast('Device name ඇතුල් කරන්න.', 'error'); return; }
+    const s = window.getPrinterSettings();
+    s.btDeviceName = name;
+    s.interface = 'bluetooth';
+    window.savePrinterSettingsData(s);
+    window.updateBtStatus('saved', name);
+    utils.showToast(`"${name}" saved as printer.`, 'success');
+};
+
+window.saveWifiPrinter = () => {
+    const ip = document.getElementById('wifi-printer-ip')?.value?.trim();
+    const port = document.getElementById('wifi-printer-port')?.value?.trim() || '9100';
+    if (!ip) { utils.showToast('IP address ඇතුල් කරන්න.', 'error'); return; }
+    const s = window.getPrinterSettings();
+    s.wifiIp = ip;
+    s.wifiPort = port;
+    s.interface = 'wifi';
+    window.savePrinterSettingsData(s);
+    utils.showToast(`WiFi Printer saved: ${ip}:${port}`, 'success');
+};
+
+window.savePrinterSettings = () => {
+    const s = window.getPrinterSettings();
+    const iface = ['bluetooth','wifi','browser'].find(i => {
+        const btn = document.getElementById(`iface-${i}`);
+        return btn && btn.className.includes('brand-500');
+    }) || s.interface || 'browser';
+    s.interface = iface;
+
+    if (iface === 'wifi') {
+        s.wifiIp = document.getElementById('wifi-printer-ip')?.value?.trim() || s.wifiIp;
+        s.wifiPort = document.getElementById('wifi-printer-port')?.value?.trim() || s.wifiPort;
+    }
+    if (iface === 'bluetooth') {
+        const name = document.getElementById('bt-manual-name')?.value?.trim();
+        if (name) s.btDeviceName = name;
+    }
+    window.savePrinterSettingsData(s);
+    utils.showToast('Printer settings saved!', 'success');
+};
+
+window.testPrinterConnection = async () => {
+    const s = window.getPrinterSettings();
+
+    if (s.interface === 'bluetooth') {
+        if (window._btPrinterCharacteristic) {
+            try {
+                // ESC/POS test: print a simple line
+                const encoder = new TextEncoder();
+                const testData = encoder.encode('\x1B@TEST PRINT - ARUNALU\n\n\n');
+                await window._btPrinterCharacteristic.writeValue(testData);
+                utils.showToast('Test print sent via Bluetooth!', 'success');
+            } catch(e) {
+                utils.showToast('Test print failed: ' + e.message, 'error');
+            }
+        } else {
+            utils.showToast('Bluetooth printer not live-connected. Please scan and connect first.', 'error');
+        }
+    } else if (s.interface === 'wifi') {
+        utils.showToast(`WiFi Printer: ${s.wifiIp || 'Not set'}:${s.wifiPort || '9100'} - Use browser print for WiFi.`, 'info');
+    } else {
+        window.print();
+    }
+};
+
+window.getPrinterSettings = () => {
+    try {
+        return JSON.parse(localStorage.getItem('printerSettings') || '{}');
+    } catch { return {}; }
+};
+
+window.savePrinterSettingsData = (data) => {
+    localStorage.setItem('printerSettings', JSON.stringify(data));
 };
 
 window.openUserModal = async (userId = null) => {
