@@ -601,6 +601,9 @@ window.printTransaction = async (id) => {
     const tx = await db.transactions.get(id);
     if (!tx) return;
 
+    const creatorUser = tx.userId ? await db.users.get(tx.userId) : null;
+    const creatorUserName = creatorUser ? creatorUser.name : 'Admin';
+
     const entries = await db.entries.where('transactionId').equals(id).toArray();
     let total = 0;
     let linesHtml = '';
@@ -623,14 +626,14 @@ window.printTransaction = async (id) => {
         const creditEntry = entries.find(e => e.credit > 0);
         total = debitEntry?.debit || 0;
         linesHtml = `
-            <tr>
-                <td class="pt-1 pb-1 text-left align-top leading-tight" style="padding-right: 4px;">Transfer To: ${accMap[debitEntry?.accountId]?.accountName || 'Unknown'}</td>
-                <td class="pt-1 pb-1 text-right align-top leading-tight whitespace-nowrap">${total.toFixed(2)}</td>
-            </tr>
-            <tr>
-                <td class="pt-1 pb-1 text-left align-top leading-tight text-gray-500" style="padding-right: 4px;">(From: ${accMap[creditEntry?.accountId]?.accountName || 'Unknown'})</td>
-                <td class="pt-1 pb-1 text-right align-top leading-tight whitespace-nowrap"></td>
-            </tr>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 2px 0;">
+                <div style="padding-right: 10px;">Transfer To: ${accMap[debitEntry?.accountId]?.accountName || 'Unknown'}</div>
+                <div style="font-weight: bold; white-space: nowrap;">${total.toFixed(2)}</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 2px 0; color: #666; font-size: 0.9em;">
+                <div style="padding-right: 10px;">(From: ${accMap[creditEntry?.accountId]?.accountName || 'Unknown'})</div>
+                <div></div>
+            </div>
         `;
     } else {
         const debitEntries = entries.filter(e => e.debit > 0);
@@ -812,58 +815,62 @@ window.printTransaction = async (id) => {
         `;
 
     } else {
-        // Standard Thermal Layout for Receipts/Transfers - Optimized for 55mm Bluetooth Printers
+        // Standard Thermal Layout for Receipts/Transfers - Optimized for 48mm Bluetooth Printers
         let statusTagHtml = '';
         if (tx.memberId && tx.type === 'Receipt') {
             const dues = await window.getMemberDues(tx.memberId, tx.date);
             if (dues.isInvalid) {
-                statusTagHtml = `<div style="text-align: center; border: 1px solid black; margin: 4px 0; font-size: 10px; font-weight: bold;">INVALID MEMBERSHIP</div>`;
+                statusTagHtml = `<div style="text-align: center; border: 1px solid black; margin: 4px 0; font-size: 9px; font-weight: bold;">INVALID MEMBERSHIP</div>`;
             } else if (dues.isNewMember) {
-                statusTagHtml = `<div style="text-align: center; border: 1px solid black; margin: 4px 0; font-size: 10px; font-weight: bold;">NEW MEMBER (GRACE)</div>`;
+                statusTagHtml = `<div style="text-align: center; border: 1px solid black; margin: 4px 0; font-size: 9px; font-weight: bold;">NEW MEMBER (GRACE)</div>`;
             }
         }
 
         printArea.innerHTML = `
             <style>
                 @media print {
-                    @page { size: 55mm auto; margin: 0; }
-                    html, body { width: 55mm !important; height: auto !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
-                    #printArea { width: 55mm !important; height: auto !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
+                    @page { size: 48mm auto; margin: 0; }
+                    html, body { width: 48mm !important; height: auto !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
+                    #printArea { width: 48mm !important; height: auto !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
                     .no-print { display: none !important; }
                 }
             </style>
-            <div style="width: 55mm; max-width: 55mm; margin: 0 auto; padding: 2mm; font-family: 'Inter', 'Iskoola Pota', sans-serif; font-size: 10px; line-height: 1.2; color: black; background: white; box-sizing: border-box;">
+            <div style="width: 48mm; max-width: 48mm; margin: 0 auto; padding: 1mm; font-family: 'Inter', 'Iskoola Pota', sans-serif; font-size: 9.5px; line-height: 1.2; color: black; background: white; box-sizing: border-box;">
                 
                 <div style="text-align: center; margin-bottom: 6px;">
-                    <h1 style="font-size: 13px; font-weight: 900; margin: 0; line-height: 1.1; text-transform: uppercase;">${(tx.unit || 'Main') === 'SAP' ? 'SAP CENTER - ARUNALU' : 'Arunalu Welfare Society'}</h1>
-                    <div style="font-size: 8px; font-weight: bold;">Galapitiyagama, Nikaweratiya</div>
+                    <h1 style="font-size: 12px; font-weight: 900; margin: 0; line-height: 1.1; text-transform: uppercase;">${(tx.unit || 'Main') === 'SAP' ? 'SAP CENTER - ARUNALU' : 'Arunalu Welfare Society'}</h1>
+                    <div style="font-size: 8px; font-weight: bold; margin-top: 1px;">Galapitiyagama, Nikaweratiya</div>
                     <div style="font-size: 7px; font-weight: bold; color: #333; margin-bottom: 3px; text-transform: uppercase;">${(tx.unit || 'Main') === 'SAP' ? 'SAP CENTER PROJECT - WELFARE BRANCH' : 'Galapitiyagama Sanasa Society <br> Welfare Branch'}</div>
-                    <div style="margin-top: 3px; font-weight: 900; text-decoration: underline; font-size: 14px; letter-spacing: 1px;">${title}</div>
+                    <div style="margin-top: 3px; font-weight: 900; text-decoration: underline; font-size: 13px; letter-spacing: 0.5px;">${title}</div>
                 </div>
                 
                 ${statusTagHtml}
 
-                <div style="display: flex; justify-content: space-between; margin-bottom: 1px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 1px; font-size: 9px;">
                     <span>Date:</span>
                     <span style="font-weight: 900;">${window.utils.formatDate(tx.date)}</span>
                 </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 1px; font-size: 9px;">
                     <span>Ref:</span>
                     <span style="font-weight: 900;">${tx.reference || '-'}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 9px;">
+                    <span>User:</span>
+                    <span style="font-weight: 900;">${creatorUserName}</span>
                 </div>
 
                 <div style="border-top: 1px dashed black; border-bottom: 1px dashed black; padding: 3px 0; margin-bottom: 4px;">
                     <div style="margin-bottom: 1px; font-size: 8px;">${tx.type === 'Receipt' ? 'PAYER:' : 'PAYEE:'}</div>
-                    <div style="font-weight: 900; font-size: 11px; line-height: 1.1;">${memberLabel}</div>
+                    <div style="font-weight: 900; font-size: 10.5px; line-height: 1.1;">${memberLabel}</div>
                 </div>
 
-                <div style="width: 100%; margin-bottom: 6px; font-size: 10px; border-bottom: 1px dashed #ccc; padding-bottom: 4px;">
+                <div style="width: 100%; margin-bottom: 6px; font-size: 9.5px; border-bottom: 1px dashed #ccc; padding-bottom: 4px;">
                     ${linesHtml}
                 </div>
 
                 <div style="border-top: 1px solid black; padding: 4px 0; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: 900; font-size: 12px;">TOTAL:</span>
-                    <span style="font-weight: 900; font-size: 13px;">Rs. ${total.toFixed(2)}</span>
+                    <span style="font-weight: 900; font-size: 11px;">TOTAL:</span>
+                    <span style="font-weight: 900; font-size: 12px;">Rs. ${total.toFixed(2)}</span>
                 </div>
 
                 ${tx.description ? `
@@ -874,15 +881,15 @@ window.printTransaction = async (id) => {
 
                 <div style="margin-top: 45px; text-align: center; display: flex; justify-content: space-between; gap: 5px;">
                     <div style="border-top: 1px solid black; width: 48%; font-size: 8px; padding-top: 2px; font-weight: bold;">Member/Payer</div>
-                    <div style="border-top: 1px solid black; width: 48%; font-size: 8px; padding-top: 2px; font-weight: bold;">${(tx.unit || 'Main') === 'SAP' ? 'Manager' : 'Treasurer'}</div>
+                    <div style="border-top: 1px solid black; width: 48%; font-size: 10px; padding-top: 4px; font-weight: bold;">${(tx.unit || 'Main') === 'SAP' ? 'Manager' : 'Treasurer'}</div>
                 </div>
 
                 ${arrearsHtml}
 
-                <div style="text-align: center; margin-top: 12px; font-size: 8px; font-weight: bold; border-top: 1px dashed #ccc; pt-2">
+                <div style="text-align: center; margin-top: 16px; font-size: 10px; font-weight: bold; border-top: 1px dashed #ccc; padding-top: 6px;">
                     THANK YOU! - IRRASOFT SOLUTION
                 </div>
-                <div style="height: 50mm; display: flex; align-items: flex-end; justify-content: center; font-size: 4px; color: #eee; clear: both; box-sizing: border-box; padding-bottom: 2mm;">.</div>
+                <div style="height: 150mm; display: flex; align-items: flex-end; justify-content: center; font-size: 4px; color: #eee; clear: both; box-sizing: border-box; padding-bottom: 2mm;">.</div>
             </div>
         `;
     }
@@ -899,11 +906,14 @@ window.printTransaction = async (id) => {
 
     Promise.all(imagePromises).then(() => {
         setTimeout(() => {
-            window.print();
-            // Cleanup
-            setTimeout(() => {
+            const cleanup = () => {
                 printArea.innerHTML = '';
-            }, 500);
+                window.removeEventListener('afterprint', cleanup);
+            };
+            window.addEventListener('afterprint', cleanup);
+            window.print();
+            // Fallback timeout in case afterprint does not fire
+            setTimeout(cleanup, 5000);
         }, 300); // Small extra buffer for rendering
     });
 };
