@@ -939,10 +939,10 @@ window.triggerReportPrint = () => {
             <style>
                 @media print {
                     @page { size: A4 portrait; margin: 15mm 15mm 15mm 20mm; }
-                    html, body { background: white !important; color: black !important; font-family: 'Inter', 'Iskoola Pota', sans-serif !important; width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+                    html, body { background: white !important; color: black !important; font-family: 'Inter', 'Iskoola Pota', sans-serif !important; width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; height: auto !important; overflow: visible !important; }
                     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                     
-                    #printArea { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+                    #printArea { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; position: static !important; height: auto !important; overflow: visible !important; }
                     
                     /* Reset colors for BW print */
                     .text-gray-400, .text-gray-500 { color: #666 !important; }

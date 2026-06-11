@@ -804,8 +804,8 @@ window.printTransaction = async (id) => {
             <style>
                 @media print {
                     @page { size: A4 portrait; margin: 0; }
-                    html, body { width: 210mm !important; margin: 0 !important; padding: 0 !important; }
-                    #printArea { width: 210mm !important; }
+                    html, body { width: 210mm !important; height: auto !important; overflow: visible !important; margin: 0 !important; padding: 0 !important; }
+                    #printArea { width: 210mm !important; position: static !important; height: auto !important; overflow: visible !important; }
                 }
             </style>
             <div style="width: 210mm; background: white;">
@@ -831,7 +831,7 @@ window.printTransaction = async (id) => {
                 @media print {
                     @page { size: 48mm auto; margin: 0; }
                     html, body { width: 48mm !important; height: auto !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
-                    #printArea { width: 48mm !important; height: auto !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
+                    #printArea { width: 48mm !important; height: auto !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; position: static !important; }
                     .no-print { display: none !important; }
                 }
             </style>
@@ -906,14 +906,7 @@ window.printTransaction = async (id) => {
 
     Promise.all(imagePromises).then(() => {
         setTimeout(() => {
-            const cleanup = () => {
-                printArea.innerHTML = '';
-                window.removeEventListener('afterprint', cleanup);
-            };
-            window.addEventListener('afterprint', cleanup);
             window.print();
-            // Fallback timeout in case afterprint does not fire
-            setTimeout(cleanup, 5000);
         }, 300); // Small extra buffer for rendering
     });
 };
