@@ -141,7 +141,11 @@ h4 {
     border-radius: 8px;
 }
 
-/* Print */
+/* Print Area - hidden on screen, shown only when printing */
+#printArea {
+    display: none !important;
+}
+
 /* Print Reset */
 @media print {
     @page {
@@ -151,30 +155,26 @@ h4 {
     html, body {
         margin: 0 !important;
         padding: 0 !important;
-        background: white;
+        background: white !important;
         height: auto !important;
         overflow: visible !important;
     }
 
-    #sidebar,
-    header,
-    .no-print,
-    #modal-container,
-    .glass-panel {
+    /* Hide the entire app shell during print */
+    body > div {
         display: none !important;
     }
 
     #printArea {
         display: block !important;
         position: static !important;
+        top: 0;
+        left: 0;
         width: 100% !important;
         height: auto !important;
         overflow: visible !important;
-    }
-
-    #app-content, 
-    main {
-        display: none !important;
+        background: white !important;
+        color: black !important;
     }
 }
 
