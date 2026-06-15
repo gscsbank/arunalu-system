@@ -1401,10 +1401,42 @@ window.getMemberDues = async (memberId, asOfDate = null) => {
     const arrearsDue = Math.max(0, (member.openingArrears || 0) - arrearsPaid);
 
     // Membership Status Flags
-    // isInvalid = TRUE only if BOTH: (1) 6+ months behind in time AND (2) actual monthly balance is outstanding
-    // If monthlyDue is 0 (fully paid up), never mark as terminated even if months elapsed >= 6
-    const isInvalid = monthsBehind >= 6 && monthlyDue > 0;
-    const sixMonthsAgo = new Date();
+    // 1. Either: If they registered/became a member and after 6 months, they have not fully paid their admission fees (ඇතුලත්වීමේ ගාස්තු).
+    let monthsSinceJoin = 0;
+    const calcDate = asOfDate ? new Date(asOfDate) : new Date();
+    if (joinDateStr) {
+        monthsSinceJoin = (calcDate.getFullYear() - joinDate.getFullYear()) * 12 + (calcDate.getMonth() - joinDate.getMonth());
+    }
+
+    // 2. Or: If they have not made any payments (kisima gewimak nokalahoth) within 6 months from their last transaction date.
+    let lastPaymentDateStr = joinDateStr;
+    if (member.openingPaidUntil) {
+        lastPaymentDateStr = member.openingPaidUntil;
+    }
+
+    const memberTxs = await db.transactions.where('memberId').equals(memberId).toArray();
+    const receipts = memberTxs.filter(t => 
+        t.type === 'Receipt' && 
+        t.status !== 'Cancelled' && 
+        (!asOfDate || t.date <= asOfDate)
+    );
+    if (receipts.length > 0) {
+        const dates = receipts.map(t => t.date);
+        dates.sort();
+        const maxTxDate = dates[dates.length - 1];
+        if (!lastPaymentDateStr || maxTxDate > lastPaymentDateStr) {
+            lastPaymentDateStr = maxTxDate;
+        }
+    }
+
+    let monthsSinceLastPayment = 0;
+    if (lastPaymentDateStr) {
+        const lastPaymentDate = new Date(lastPaymentDateStr + (lastPaymentDateStr.length === 7 ? "-01" : ""));
+        monthsSinceLastPayment = (calcDate.getFullYear() - lastPaymentDate.getFullYear()) * 12 + (calcDate.getMonth() - lastPaymentDate.getMonth());
+    }
+
+    const isInvalid = (monthsSinceJoin >= 6 && entranceDue > 0) || (monthsSinceLastPayment >= 6 && monthlyDue > 0);
+    const sixMonthsAgo = new Date(calcDate);
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     const isNewMember = joinDate > sixMonthsAgo;
 

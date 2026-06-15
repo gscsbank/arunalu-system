@@ -120,6 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'monthly_book': typeof window.renderMonthlyBook === 'function' ? window.renderMonthlyBook : async () => `<div class="glass-panel p-6 rounded-2xl">Monthly Book under construction...</div>`,
             'settings': typeof window.renderSettings === 'function' ? window.renderSettings : async () => `<div class="glass-panel p-6 rounded-2xl">Settings under construction...</div>`,
             'backup': typeof window.renderBackupView === 'function' ? window.renderBackupView : async () => `<div class="glass-panel p-6 rounded-2xl">Backup under construction...</div>`,
+            'support': renderSupportView,
         };
 
         console.log("Switching view to:", view, "Renderer function:", renderers[view]);
@@ -144,6 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'monthly_book': typeof mountMonthlyBook !== 'undefined' ? mountMonthlyBook : () => { },
             'settings': typeof mountSettings !== 'undefined' ? mountSettings : () => { },
             'backup': typeof mountBackupView !== 'undefined' ? mountBackupView : () => { },
+            'support': () => { },
             'dashboard': mountDashboard
         };
 
@@ -429,6 +431,113 @@ document.addEventListener('DOMContentLoaded', () => {
                 globalSearch.focus();
             }
         });
+    }
+
+    // Render support / customer care view
+    async function renderSupportView() {
+        return `
+            <div class="space-y-8 animate-fade-in">
+                <!-- Welcome Banner -->
+                <div class="relative bg-gradient-to-r from-indigo-900 to-indigo-800 p-8 rounded-3xl overflow-hidden shadow-2xl">
+                    <div class="relative z-10">
+                        <h2 class="text-2xl font-black text-white tracking-tight">පද්ධති සේවා සහ සහාය</h2>
+                        <p class="text-indigo-200 text-sm mt-1 font-medium">System Services & Customer Care Support</p>
+                    </div>
+                    <div class="absolute right-10 top-1/2 -translate-y-1/2 opacity-10 hidden md:block">
+                        <i class="fa-solid fa-headset text-9xl text-white"></i>
+                    </div>
+                    <div class="absolute -left-10 -bottom-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl"></div>
+                </div>
+
+                <!-- Support Info Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Contact Methods -->
+                    <div class="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm flex flex-col justify-between">
+                        <div>
+                            <h3 class="text-lg font-black text-gray-900 tracking-tight mb-2">සම්බන්ධීකරණ විස්තර</h3>
+                            <p class="text-xs text-gray-400 font-bold uppercase tracking-widest mb-6">Contact Channels</p>
+                            
+                            <div class="space-y-4">
+                                <!-- Phone -->
+                                <a href="tel:+94752895951" class="flex items-center gap-4 p-4 bg-gray-50 hover:bg-indigo-50/50 hover:border-indigo-200 border border-transparent rounded-2xl transition-all group">
+                                    <div class="w-12 h-12 rounded-xl bg-white text-indigo-600 flex items-center justify-center border border-gray-100 shadow-sm transition-transform group-hover:scale-110">
+                                        <i class="fa-solid fa-phone text-lg"></i>
+                                    </div>
+                                    <div class="text-left">
+                                        <span class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter block">Phone Call</span>
+                                        <span class="text-sm font-black text-gray-800 block">+94 75 289 5951</span>
+                                    </div>
+                                </a>
+
+                                <!-- WhatsApp -->
+                                <a href="https://wa.me/94752895951" target="_blank" class="flex items-center gap-4 p-4 bg-gray-50 hover:bg-emerald-50/50 hover:border-emerald-200 border border-transparent rounded-2xl transition-all group">
+                                    <div class="w-12 h-12 rounded-xl bg-white text-emerald-500 flex items-center justify-center border border-gray-100 shadow-sm transition-transform group-hover:scale-110">
+                                        <i class="fa-brands fa-whatsapp text-2xl"></i>
+                                    </div>
+                                    <div class="text-left">
+                                        <span class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter block">WhatsApp</span>
+                                        <span class="text-sm font-black text-gray-800 block">+94 75 289 5951</span>
+                                    </div>
+                                </a>
+
+                                <!-- Telegram -->
+                                <a href="https://t.me/INDUNILRATHNAYAKA" target="_blank" class="flex items-center gap-4 p-4 bg-gray-50 hover:bg-sky-50/50 hover:border-sky-200 border border-transparent rounded-2xl transition-all group">
+                                    <div class="w-12 h-12 rounded-xl bg-white text-sky-500 flex items-center justify-center border border-gray-100 shadow-sm transition-transform group-hover:scale-110">
+                                        <i class="fa-brands fa-telegram text-2xl"></i>
+                                    </div>
+                                    <div class="text-left">
+                                        <span class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter block">Telegram</span>
+                                        <span class="text-sm font-black text-gray-800 block">@INDUNILRATHNAYAKA</span>
+                                    </div>
+                                </a>
+
+                                <!-- Email -->
+                                <a href="mailto:iraafxtrading@gmail.com" class="flex items-center gap-4 p-4 bg-gray-50 hover:bg-rose-50/50 hover:border-rose-200 border border-transparent rounded-2xl transition-all group">
+                                    <div class="w-12 h-12 rounded-xl bg-white text-rose-500 flex items-center justify-center border border-gray-100 shadow-sm transition-transform group-hover:scale-110">
+                                        <i class="fa-solid fa-envelope text-lg"></i>
+                                    </div>
+                                    <div class="text-left">
+                                        <span class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter block">Email Address</span>
+                                        <span class="text-sm font-black text-gray-800 block">iraafxtrading@gmail.com</span>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Developer Card -->
+                    <div class="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm flex flex-col justify-between">
+                        <div>
+                            <h3 class="text-lg font-black text-gray-900 tracking-tight mb-2">පද්ධති සේවා සපයන්නා</h3>
+                            <p class="text-xs text-gray-400 font-bold uppercase tracking-widest mb-6">Service Developer</p>
+                            
+                            <div class="bg-indigo-50/50 rounded-2xl p-6 border border-indigo-100 space-y-4 mb-6">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center text-2xl font-black shadow-md shadow-indigo-600/20">
+                                        I
+                                    </div>
+                                    <div>
+                                        <h4 class="text-lg font-black text-gray-900 leading-none font-header">Iraasoft Solution</h4>
+                                        <span class="text-[10px] text-indigo-600 font-bold uppercase tracking-wider block mt-1">Enterprise Software Development</span>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-gray-600 leading-relaxed">
+                                    පද්ධතියේ කිසියම් ගැටලුවක්, නව විශේෂාංග එකතු කිරීමක් (Customizations) හෝ තාක්ෂණික සහාය සඳහා ඉහත සඳහන් කළ ඕනෑම මාධ්‍යයක් ඔස්සේ අප හා සම්බන්ධ විය හැක.
+                                </p>
+                            </div>
+
+                            <div class="p-5 bg-gray-50 rounded-2xl border border-gray-100">
+                                <h5 class="text-xs font-black text-gray-400 uppercase mb-3">Working Hours / සේවා වේලාවන්</h5>
+                                <ul class="text-[11px] text-gray-500 space-y-2 list-disc pl-4">
+                                    <li>සෑම දිනකම පෙ.ව. 8:00 සිට ප.ව. 10:00 දක්වා සේවා සහාය ලබාගත හැක.</li>
+                                    <li>WhatsApp හෝ Telegram පණිවිඩයක් ඔස්සේ ක්ෂණික පිළිතුරු ලබා ගත හැක.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     // Initialize Dashboard

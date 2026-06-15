@@ -132,35 +132,19 @@ window.backupModule = {
     },
 
     showBackupReminder() {
-        const hasDrive = !!localStorage.getItem('google_drive_script_url');
-        const driveHtml = hasDrive ? `
-            <button onclick="window.utils.closeModal(); window.backupModule.syncToGoogleDrive()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 mb-3">
-                <i class="fa-brands fa-google-drive text-lg"></i> Sync to Google Drive
-            </button>
-        ` : `
-            <div class="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-left flex gap-2.5 items-start">
-                <i class="fa-solid fa-lightbulb text-blue-600 mt-0.5"></i>
-                <p class="text-[11px] text-blue-800 font-medium leading-relaxed">
-                    <strong>ක්‍ෂණික උපදෙසක්:</strong> ඔබට මෙම දත්ත Google Drive එකට sync කිරීමට සැකසිය හැක. <strong>Settings -> Backup</strong> වෙත ගොස් Google Drive සම්බන්ධ කරන්න.
-                </p>
-            </div>
-        `;
-
         const html = `
             <div class="text-center p-4">
-                <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-                    <i class="fa-solid fa-clock-rotate-left text-2xl"></i>
+                <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                    <i class="fa-solid fa-cloud-arrow-up text-2xl"></i>
                 </div>
-                <h3 class="text-xl font-black text-gray-900 uppercase tracking-tighter mb-2">දෛනික බැකප් මතක් කිරීම</h3>
-                <p class="text-gray-500 text-sm mb-5">සවස 5:00 පසු වී ඇත. කරුණාකර අද දින දත්ත සුරක්ෂිතව තබා ගැනීමට බැකප් එකක් ලබා ගන්න.</p>
-                
-                ${driveHtml}
-
-                <div class="space-y-2">
-                    <button onclick="window.utils.closeModal(); window.backupModule.handleBackupFlow()" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-green-500/30 flex items-center justify-center gap-2">
-                        <i class="fa-brands fa-whatsapp text-lg"></i> Backup & Share (WhatsApp)
+                <h3 class="text-xl font-black text-gray-900 uppercase tracking-tighter mb-2">බැකප් මතක් කිරීම</h3>
+                <p class="text-gray-600 text-sm mb-6 font-medium leading-relaxed">
+                    සවස 5:00 පසු වී ඇත. කරුණාකර ඔබගේ සිස්ටම් එකේ <strong>Backup & Sync</strong> වෙත ගොස් බැකප් එක Sync කරන්න.
+                </p>
+                <div class="flex gap-3">
+                    <button onclick="window.utils.closeModal()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-500/30">
+                        හරි (OK)
                     </button>
-                    <button onclick="window.utils.closeModal()" class="w-full mt-3 text-gray-400 text-xs font-bold uppercase tracking-widest">Later</button>
                 </div>
             </div>
         `;
