@@ -142,11 +142,16 @@ async function loadAccountsTable() {
                         <td class="px-6 py-4 text-sm text-right font-black ${balance < 0 ? 'text-red-600' : 'text-gray-900'}">
                             ${formatCurrency(balance)}
                         </td>
-                        <td class="px-6 py-4 text-sm text-right space-x-1">
-                            <button onclick="editAccount(${a.id})" class="w-7 h-7 rounded-lg bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-all opacity-0 group-hover:opacity-100">
+                        <td class="px-6 py-4 text-sm text-right space-x-1 whitespace-nowrap">
+                            ${(a.accountName.includes('අත්තිකාරම්') || a.accountName.toLowerCase().includes('loan') || a.accountType === 'Liability') ? `
+                            <button onclick="window.openAdvanceLoanModal(${a.id})" class="px-2 py-1 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 transition-all text-xs font-bold inline-flex items-center gap-1 border border-amber-200 mr-1" title="ණය පියවීම හෝ අලුත් කිරීම">
+                                <i class="fa-solid fa-hand-holding-dollar"></i> <span class="hidden xl:inline">ණය පියවීම/අලුත් කිරීම</span>
+                            </button>
+                            ` : ''}
+                            <button onclick="editAccount(${a.id})" class="w-7 h-7 rounded-lg bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-all opacity-0 group-hover:opacity-100" title="Edit">
                                 <i class="fa-solid fa-pen text-xs"></i>
                             </button>
-                            <button onclick="deleteAccount(${a.id})" class="w-7 h-7 rounded-lg bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all opacity-0 group-hover:opacity-100">
+                            <button onclick="deleteAccount(${a.id})" class="w-7 h-7 rounded-lg bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all opacity-0 group-hover:opacity-100" title="Delete">
                                 <i class="fa-solid fa-trash text-xs"></i>
                             </button>
                         </td>

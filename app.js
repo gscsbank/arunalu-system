@@ -108,14 +108,37 @@ document.addEventListener('DOMContentLoaded', () => {
     async function switchView(view) {
         currentView = view;
         if (pageTitle) {
-            pageTitle.textContent = view.charAt(0).toUpperCase() + view.slice(1);
+            const pageTitles = {
+                'dashboard': 'Dashboard',
+                'members': 'Members',
+                'accounts': 'Chart of Accounts',
+                'transactions': 'Transactions',
+                'funerals': 'Funeral Events',
+                'reports': 'Reports',
+                'monthly_book': 'Monthly Book',
+                'settings': 'Settings',
+                'backup': 'Backup & Sync',
+                'support': 'System Services'
+            };
+            pageTitle.textContent = pageTitles[view] || (view.charAt(0).toUpperCase() + view.slice(1));
         }
+
+        // Highlight sidebar nav item
+        navLinks.forEach(l => {
+            if (l.dataset.view === view) {
+                l.classList.add('active-nav');
+            } else {
+                l.classList.remove('active-nav');
+                l.style.borderLeft = 'none';
+            }
+        });
 
         const renderers = {
             'dashboard': renderDashboard,
             'members': typeof window.renderMembers === 'function' ? window.renderMembers : async () => `<div class="glass-panel p-6 rounded-2xl">Members under construction...</div>`,
             'accounts': typeof window.renderAccounts === 'function' ? window.renderAccounts : async () => `<div class="glass-panel p-6 rounded-2xl">Accounts under construction...</div>`,
             'transactions': typeof window.renderTransactions === 'function' ? window.renderTransactions : async () => `<div class="glass-panel p-6 rounded-2xl">Transactions under construction...</div>`,
+            'funerals': typeof window.renderFuneralsView === 'function' ? window.renderFuneralsView : async () => `<div class="glass-panel p-6 rounded-2xl">Funerals under construction...</div>`,
             'reports': typeof window.renderReports === 'function' ? window.renderReports : async () => `<div class="glass-panel p-6 rounded-2xl">Reports under construction...</div>`,
             'monthly_book': typeof window.renderMonthlyBook === 'function' ? window.renderMonthlyBook : async () => `<div class="glass-panel p-6 rounded-2xl">Monthly Book under construction...</div>`,
             'settings': typeof window.renderSettings === 'function' ? window.renderSettings : async () => `<div class="glass-panel p-6 rounded-2xl">Settings under construction...</div>`,
@@ -141,6 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'members': typeof mountMembers !== 'undefined' ? mountMembers : () => { },
             'accounts': typeof mountAccounts !== 'undefined' ? mountAccounts : () => { },
             'transactions': typeof mountTransactions !== 'undefined' ? mountTransactions : () => { },
+            'funerals': typeof mountFuneralsView !== 'undefined' ? mountFuneralsView : () => { },
             'reports': typeof mountReports !== 'undefined' ? mountReports : () => { },
             'monthly_book': typeof mountMonthlyBook !== 'undefined' ? mountMonthlyBook : () => { },
             'settings': typeof mountSettings !== 'undefined' ? mountSettings : () => { },
@@ -148,6 +172,8 @@ document.addEventListener('DOMContentLoaded', () => {
             'support': () => { },
             'dashboard': mountDashboard
         };
+
+        if (window.updateFuneralsNavBadge) window.updateFuneralsNavBadge();
 
         requestAnimationFrame(() => {
             const addedElement = contentArea.querySelector('.fade-enter');
@@ -321,6 +347,28 @@ document.addEventListener('DOMContentLoaded', () => {
                                         <span class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Money Inflow</span>
                                     </div>
                                 </button>
+
+                                <button onclick="window.openAdvanceLoanModal()" class="flex items-center gap-4 p-4 bg-gray-50 hover:bg-white hover:shadow-lg hover:border-amber-200 border border-transparent rounded-2xl transition-all group">
+                                    <div class="w-10 h-10 rounded-xl bg-white text-amber-600 flex items-center justify-center border border-gray-100 shadow-sm transition-transform group-hover:scale-110">
+                                        <i class="fa-solid fa-hand-holding-dollar text-sm"></i>
+                                    </div>
+                                    <div class="text-left">
+                                        <span class="text-sm font-black text-gray-800 block">ස්ථාවර තැන්පතු ණය</span>
+                                        <span class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">පියවීම / අලුත් කිරීම</span>
+                                    </div>
+                                </button>
+
+                                ${!isSAP ? `
+                                <button onclick="window.openFuneralModal()" class="flex items-center gap-4 p-4 bg-gray-50 hover:bg-white hover:shadow-lg hover:border-rose-200 border border-transparent rounded-2xl transition-all group">
+                                    <div class="w-10 h-10 rounded-xl bg-white text-rose-600 flex items-center justify-center border border-gray-100 shadow-sm transition-transform group-hover:scale-110">
+                                        <i class="fa-solid fa-hands-praying text-sm"></i>
+                                    </div>
+                                    <div class="text-left">
+                                        <span class="text-sm font-black text-gray-800 block">මරණ හා තුන්මාසේ දාන</span>
+                                        <span class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">අටපිරිකර සිහිකැඳවීම්</span>
+                                    </div>
+                                </button>
+                                ` : ''}
 
                                 <button onclick="switchView('reports')" class="flex items-center gap-4 p-4 bg-gray-50 hover:bg-white hover:shadow-lg hover:border-brand-200 border border-transparent rounded-2xl transition-all group">
                                     <div class="w-10 h-10 rounded-xl bg-white text-indigo-600 flex items-center justify-center border border-gray-100 shadow-sm transition-transform group-hover:scale-110">
@@ -540,6 +588,40 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
+    async function updateFuneralsNavBadge() {
+        const badge = document.getElementById('funeralsBadge');
+        const navItem = document.getElementById('nav-item-funerals');
+        if (!badge || !navItem) return;
+
+        if (window.currentUnit === 'SAP') {
+            navItem.classList.add('hidden');
+            return;
+        }
+        navItem.classList.remove('hidden');
+
+        try {
+            const allFunerals = await db.funerals.toArray();
+            const urgentCount = allFunerals.filter(f => {
+                if (f.atapirikaraGiven) return false;
+                const info = window.get3MonthAlmsgivingStatus ? window.get3MonthAlmsgivingStatus(f.date, f.atapirikaraGiven) : null;
+                return info && info.isUrgent;
+            }).length;
+
+            if (urgentCount > 0) {
+                badge.textContent = urgentCount;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        } catch (e) {
+            console.error("Error updating funerals badge:", e);
+        }
+    }
+    window.updateFuneralsNavBadge = updateFuneralsNavBadge;
+
     // Initialize Dashboard
-    setTimeout(() => switchView('dashboard'), 100);
+    setTimeout(() => {
+        switchView('dashboard');
+        updateFuneralsNavBadge();
+    }, 100);
 });

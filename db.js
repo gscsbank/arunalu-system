@@ -36,7 +36,9 @@ async function initDefaultAccounts() {
         { accountName: 'ඇතුලත්වීමේ ගාස්තු ලැබීම්', accountType: 'Income', category: 'Revenue', unit: 'Main' },
         { accountName: 'මාසික සාමාජික මුදල් ලැබීම්', accountType: 'Income', category: 'Revenue', unit: 'Main' },
         { accountName: 'සුභ සාධක අරමුදල් ලැබීම්', accountType: 'Income', category: 'Revenue', oldName: 'Funeral Contribution (Rs. 200)' },
-        { accountName: 'හිඟ මුදල් ලැබීම්', accountType: 'Income', category: 'Revenue', unit: 'Main' }
+        { accountName: 'හිඟ මුදල් ලැබීම්', accountType: 'Income', category: 'Revenue', unit: 'Main' },
+        { accountName: 'ණය පොලී වියදම්', accountType: 'Expense', category: 'Financial Expense', unit: 'Main' },
+        { accountName: 'ස්ථාවර තැන්පතු පොලී ආදායම', accountType: 'Income', category: 'Investment Income', unit: 'Main' }
     ];
 
     for (let acc of requiredAccounts) {

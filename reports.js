@@ -37,6 +37,15 @@ async function renderReports() {
                 <div id="monthSelectorContainer" class="hidden animate-fade-in">
                     <input type="month" id="reportMonth" class="px-4 py-2 rounded-xl border border-brand-200 focus:border-brand-500 bg-white w-48 outline-none shadow-sm">
                 </div>
+
+                <!-- Receipt Book Reference Range Filter -->
+                <div id="receiptFilterContainer" class="hidden animate-fade-in flex items-center gap-2 bg-brand-50/50 p-1 rounded-xl border border-brand-100">
+                    <span class="text-xs text-brand-800 font-bold px-1.5"><i class="fa-solid fa-receipt mr-1"></i>රිසිට්පත් අංක:</span>
+                    <input type="text" id="reportRefFrom" placeholder="From (උදා: AR000001)" class="px-2.5 py-1.5 rounded-lg border border-gray-200 focus:border-brand-500 bg-white outline-none w-36 text-xs font-bold text-gray-800" onkeydown="if(event.key==='Enter') generateReport()">
+                    <span class="text-xs text-gray-400 font-bold">සිට</span>
+                    <input type="text" id="reportRefTo" placeholder="To (උදා: AR000050)" class="px-2.5 py-1.5 rounded-lg border border-gray-200 focus:border-brand-500 bg-white outline-none w-36 text-xs font-bold text-gray-800" onkeydown="if(event.key==='Enter') generateReport()">
+                </div>
+
                 <div class="flex items-center gap-2">
                     <span class="text-sm text-gray-500 font-medium">From:</span>
                     <input type="date" id="reportStartDate" class="px-3 py-2 rounded-xl border border-gray-200 focus:border-brand-500 bg-white/50 outline-none w-36">
@@ -45,7 +54,9 @@ async function renderReports() {
                     <span class="text-sm text-gray-500 font-medium">To:</span>
                     <input type="date" id="reportDate" class="px-3 py-2 rounded-xl border border-gray-200 focus:border-brand-500 bg-white/50 outline-none w-36">
                 </div>
-                <button onclick="generateReport()" class="bg-brand-50 text-brand-600 px-5 py-2 rounded-xl border border-brand-100 hover:bg-brand-100 font-medium">Generate</button>
+                <button onclick="generateReport()" class="bg-brand-50 text-brand-600 px-5 py-2 rounded-xl border border-brand-100 hover:bg-brand-100 font-medium flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrows-rotate"></i> Generate
+                </button>
             </div>
 
             <!-- Report Content Area (Printed) -->
@@ -57,6 +68,62 @@ async function renderReports() {
             </div>
         </div>
     `;
+}
+
+function isReceiptRefInRange(ref, fromRef, toRef) {
+    if (!fromRef && !toRef) return true;
+    if (!ref) return false;
+    const r = ref.trim().toUpperCase();
+    const from = (fromRef || '').trim().toUpperCase();
+    const to = (toRef || '').trim().toUpperCase();
+
+    if (!from && !to) return true;
+
+    // Helper to extract prefix and number: "AR000123" -> prefix: "AR", num: 123
+    const parse = (str) => {
+        if (!str) return { prefix: '', num: null, raw: '' };
+        const m = str.match(/^([A-Za-z\-_]*)\s*0*(\d+)$/);
+        if (m) {
+            return { prefix: m[1], num: parseInt(m[2], 10), raw: str };
+        }
+        return { prefix: '', num: null, raw: str };
+    };
+
+    const pRef = parse(r);
+    const pFrom = from ? parse(from) : null;
+    const pTo = to ? parse(to) : null;
+
+    // If numeric comparison is possible
+    if (pRef.num !== null) {
+        if (pFrom && pTo && pFrom.num !== null && pTo.num !== null) {
+            const prefixMatches = (!pFrom.prefix || pFrom.prefix === pRef.prefix) && (!pTo.prefix || pTo.prefix === pRef.prefix);
+            if (prefixMatches) {
+                return pRef.num >= pFrom.num && pRef.num <= pTo.num;
+            }
+        } else if (pFrom && pFrom.num !== null && !pTo) {
+            const prefixMatches = !pFrom.prefix || pFrom.prefix === pRef.prefix;
+            if (prefixMatches) {
+                return pRef.num >= pFrom.num;
+            }
+        } else if (pTo && pTo.num !== null && !pFrom) {
+            const prefixMatches = !pTo.prefix || pTo.prefix === pRef.prefix;
+            if (prefixMatches) {
+                return pRef.num <= pTo.num;
+            }
+        }
+    }
+
+    // Alphanumeric comparison / substring fallback
+    if (from && to) {
+        return r.localeCompare(from, undefined, { numeric: true }) >= 0 && r.localeCompare(to, undefined, { numeric: true }) <= 0;
+    }
+    if (from) {
+        return r.localeCompare(from, undefined, { numeric: true }) >= 0 || r.includes(from);
+    }
+    if (to) {
+        return r.localeCompare(to, undefined, { numeric: true }) <= 0 || r.includes(to);
+    }
+    return true;
 }
 
 function mountReports() {
@@ -115,12 +182,32 @@ window.generateReport = async () => {
     if (monthSel) {
         monthSel.classList.toggle('hidden', type !== 'monthly_book');
     }
-
-
+    // Toggle Receipt Book Ref Range Filter visibility
+    const recFilter = document.getElementById('receiptFilterContainer');
+    if (recFilter) {
+        recFilter.classList.toggle('hidden', type !== 'receipt_book');
+    }
 
     let dateSubtitle = "දිනය: " + window.utils.formatDate(date);
-    if (['pnl', 'receipt_payment', 'gl_transactions', 'receipt_book'].includes(type) && startDate) {
+    if (['pnl', 'receipt_payment', 'gl_transactions'].includes(type) && startDate) {
         dateSubtitle = "කාල සීමාව: " + window.utils.formatDate(startDate) + " සිට " + window.utils.formatDate(date) + " දක්වා";
+    } else if (type === 'receipt_book') {
+        const refFrom = document.getElementById('reportRefFrom')?.value.trim();
+        const refTo = document.getElementById('reportRefTo')?.value.trim();
+        const subParts = [];
+        if (startDate && date) {
+            subParts.push("කාල සීමාව: " + window.utils.formatDate(startDate) + " සිට " + window.utils.formatDate(date) + " දක්වා");
+        } else if (date) {
+            subParts.push("දිනය: " + window.utils.formatDate(date));
+        }
+        if (refFrom && refTo) {
+            subParts.push("රිසිට්පත් අංක: " + refFrom + " සිට " + refTo + " දක්වා");
+        } else if (refFrom) {
+            subParts.push("රිසිට්පත් අංක: " + refFrom + " සිට ඉදිරියට");
+        } else if (refTo) {
+            subParts.push("රිසිට්පත් අංක: " + refTo + " දක්වා");
+        }
+        dateSubtitle = subParts.join(' | ') || ("කාල සීමාව: " + window.utils.formatDate(startDate) + " සිට " + window.utils.formatDate(date) + " දක්වා");
     }
 
     const headerHtml = `
@@ -694,7 +781,15 @@ window.generateReport = async () => {
             </table>
         `;
     } else if (type === 'receipt_book') {
-        const receiptTxs = validTxsPeriod.filter(t => t.type === 'Receipt').sort((a, b) => {
+        const refFrom = document.getElementById('reportRefFrom')?.value.trim();
+        const refTo = document.getElementById('reportRefTo')?.value.trim();
+
+        let receiptTxs = validTxsPeriod.filter(t => t.type === 'Receipt');
+        if (refFrom || refTo) {
+            receiptTxs = receiptTxs.filter(t => isReceiptRefInRange(t.reference, refFrom, refTo));
+        }
+
+        receiptTxs.sort((a, b) => {
             return (a.reference || '').localeCompare(b.reference || '', undefined, { numeric: true });
         });
 
@@ -754,7 +849,7 @@ window.generateReport = async () => {
                     </tr>
                 </thead>
                 <tbody>
-                    ${rowsHtml || '<tr><td colspan="6" class="py-12 text-center text-gray-400 italic">මෙම කාල සීමාව තුළ ලැබීම් (Receipts) දත්ත නැත</td></tr>'}
+                    ${rowsHtml || '<tr><td colspan="6" class="py-12 text-center text-gray-400 italic">මෙම කාල සීමාව / රිසිට්පත් අංක පරාසය තුළ ලැබීම් (Receipts) දත්ත නැත</td></tr>'}
                 </tbody>
                 <tfoot>
                     <tr class="border-t-2 border-b-4 border-gray-900 font-black bg-gray-50">

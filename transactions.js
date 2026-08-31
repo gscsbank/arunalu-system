@@ -17,6 +17,9 @@ async function renderTransactions() {
                     <button onclick="openTransferModal()" class="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30 border border-blue-500 text-sm">
                         <i class="fa-solid fa-exchange-alt"></i> Transfer
                     </button>
+                    <button onclick="window.openAdvanceLoanModal()" class="flex-1 md:flex-none bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 shadow-lg shadow-amber-500/30 border border-amber-500 text-sm" title="ස්ථාවර තැන්පතු අත්තිකාරම් ණය පියවීම සහ අලුත් කිරීම">
+                        <i class="fa-solid fa-hand-holding-dollar"></i> අත්තිකාරම් ණය
+                    </button>
                     ${window.currentUnit === 'Main' ? `
                     <button onclick="window.openFuneralModal()" class="flex-1 md:flex-none bg-gray-800 hover:bg-black text-white px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 shadow-lg shadow-gray-500/30 text-sm">
                         <i class="fa-solid fa-cross"></i> Deaths
@@ -1498,72 +1501,217 @@ window.addTxLineWithAmount = (accountId, amount) => {
     if (amountInput) amountInput.value = amount;
 };
 
+// ==========================================
+// 3-MONTH ALMSGIVING & ATAPIRIKARA REMINDERS
+// ==========================================
+
+window.calculate3MonthDate = (funeralDateStr) => {
+    if (!funeralDateStr) return '';
+    const parts = funeralDateStr.split('-');
+    if (parts.length === 3) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const d = parseInt(parts[2], 10);
+        const targetDate = new Date(y, m - 1 + 3, d);
+        return targetDate.toISOString().split('T')[0];
+    }
+    const dt = new Date(funeralDateStr);
+    dt.setMonth(dt.getMonth() + 3);
+    return dt.toISOString().split('T')[0];
+};
+
+window.get3MonthAlmsgivingStatus = (funeralDateStr, atapirikaraGiven = false) => {
+    if (!funeralDateStr) return { status: 'unknown', text: '-', daysDiff: 0, targetDate: '', isUrgent: false };
+    const targetDateStr = window.calculate3MonthDate(funeralDateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const targetDate = new Date(targetDateStr);
+    targetDate.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.round((targetDate - today) / (1000 * 60 * 60 * 24));
+
+    if (atapirikaraGiven) {
+        return {
+            status: 'completed',
+            targetDate: targetDateStr,
+            daysDiff: diffDays,
+            badgeClass: 'bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold',
+            text: '✅ අටපිරිකර ලබාදී ඇත',
+            isUrgent: false
+        };
+    }
+
+    if (diffDays < 0) {
+        return {
+            status: 'overdue',
+            targetDate: targetDateStr,
+            daysDiff: diffDays,
+            badgeClass: 'bg-red-100 text-red-800 border border-red-200 font-bold',
+            text: `🚨 දින ${Math.abs(diffDays)} ක් පසුවී ඇත`,
+            isUrgent: true
+        };
+    } else if (diffDays === 0) {
+        return {
+            status: 'today',
+            targetDate: targetDateStr,
+            daysDiff: diffDays,
+            badgeClass: 'bg-red-600 text-white border border-red-700 font-black animate-pulse',
+            text: '⚠️ අද දිනට යෙදී ඇත (Today!)',
+            isUrgent: true
+        };
+    } else if (diffDays <= 7) {
+        return {
+            status: 'urgent',
+            targetDate: targetDateStr,
+            daysDiff: diffDays,
+            badgeClass: 'bg-amber-100 text-amber-900 border border-amber-300 font-black',
+            text: `🔔 තව දින ${diffDays} යි (සතියක් තුළ)`,
+            isUrgent: true
+        };
+    } else if (diffDays <= 14) {
+        return {
+            status: 'upcoming',
+            targetDate: targetDateStr,
+            daysDiff: diffDays,
+            badgeClass: 'bg-blue-100 text-blue-800 border border-blue-200 font-semibold',
+            text: `📅 තව දින ${diffDays} යි (සති 2ක් තුළ)`,
+            isUrgent: true
+        };
+    } else {
+        return {
+            status: 'future',
+            targetDate: targetDateStr,
+            daysDiff: diffDays,
+            badgeClass: 'bg-gray-100 text-gray-700 border border-gray-200',
+            text: `තව දින ${diffDays} යි`,
+            isUrgent: false
+        };
+    }
+};
+
+window.toggleAtapirikaraGiven = async (funeralId) => {
+    const f = await db.funerals.get(funeralId);
+    if (!f) return;
+    const newState = !f.atapirikaraGiven;
+    await db.funerals.update(funeralId, {
+        atapirikaraGiven: newState,
+        atapirikaraGivenDate: newState ? new Date().toISOString().split('T')[0] : null
+    });
+    window.utils.showToast(newState ? "අටපිරිකර ලබාදුන් බව සටහන් විය (Marked as Given)" : "අටපිරිකර ලබාදීම Pending ලෙස සටහන් විය");
+    window.openFuneralModal();
+    if (window.refreshCurrentView) window.refreshCurrentView();
+};
+
 // Funeral Management
+window._funeralMembersCache = [];
+
+window.handleFuneralMemberSelection = (value) => {
+    const hidden = document.getElementById('fMember');
+    if (!hidden) return;
+    const val = (value || '').trim().toLowerCase();
+    const match = window._funeralMembersCache?.find(m => {
+        const mNo = String(m.memberNo || '').trim().toLowerCase();
+        const mName = String(m.name || '').trim().toLowerCase();
+        const combined = `${mNo} - ${mName}`;
+        return combined === val || mNo === val || mName === val;
+    });
+    hidden.value = match ? match.id : '';
+};
+
 window.openFuneralModal = async () => {
     const members = await db.members.toArray();
-    const memOptions = members.map(m => `<option value="${m.id}">${m.memberNo} - ${m.name}</option>`).join('');
+    window._funeralMembersCache = members;
+    const memDatalistOptions = members.map(m => `<option value="${m.memberNo ? m.memberNo + ' - ' : ''}${m.name}"></option>`).join('');
 
     const funerals = (await db.funerals.toArray()).sort((a, b) => new Date(b.date) - new Date(a.date));
+
     const funeralRows = funerals.map(f => {
         const m = members.find(mem => mem.id === f.memberId);
+        const st = window.get3MonthAlmsgivingStatus(f.date, f.atapirikaraGiven);
         return `
-            <tr class="border-b border-gray-100 hover:bg-gray-50">
-                <td class="px-4 py-3 text-sm text-gray-600">${window.utils.formatDate(f.date)}</td>
-                <td class="px-4 py-3 text-sm font-medium text-gray-800">${m ? m.name : 'Unknown'}</td>
-                <td class="px-4 py-3 text-sm text-gray-600">${f.description || '-'}</td>
-                <td class="px-4 py-3 text-right">
-                    <button onclick="window.editFuneral(${f.id})" class="text-brand-500 hover:text-brand-700 transition-colors mr-3"><i class="fa-solid fa-pen-to-square"></i></button>
-                    <button onclick="window.deleteFuneral(${f.id})" class="text-red-400 hover:text-red-600 transition-colors"><i class="fa-solid fa-trash"></i></button>
+            <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                <td class="px-4 py-3 text-xs font-bold text-gray-700 whitespace-nowrap">${window.utils.formatDate(f.date)}</td>
+                <td class="px-4 py-3 text-xs font-black text-gray-900">${m ? `${m.memberNo ? m.memberNo + ' - ' : ''}${m.name}` : 'Unknown'}</td>
+                <td class="px-4 py-3 text-xs text-gray-600">${f.description || '-'}</td>
+                <td class="px-4 py-3 text-xs whitespace-nowrap">
+                    <div class="font-bold text-gray-800">${window.utils.formatDate(st.targetDate)}</div>
+                    <div class="inline-block px-2 py-0.5 rounded text-[10px] font-bold mt-0.5 ${st.badgeClass}">${st.text}</div>
+                </td>
+                <td class="px-4 py-3 text-center whitespace-nowrap">
+                    <button type="button" onclick="window.toggleAtapirikaraGiven(${f.id})" class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${f.atapirikaraGiven ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100' : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'} flex items-center gap-1.5 mx-auto shadow-sm" title="අටපිරිකර ලබාදීම සලකුණු කරන්න">
+                        <i class="fa-solid ${f.atapirikaraGiven ? 'fa-circle-check text-emerald-600' : 'fa-clock text-amber-600'}"></i>
+                        <span>${f.atapirikaraGiven ? 'ලබාදී ඇත' : 'ලබාදීමට ඇත'}</span>
+                    </button>
+                </td>
+                <td class="px-4 py-3 text-right whitespace-nowrap">
+                    <button onclick="window.editFuneral(${f.id})" class="text-brand-500 hover:text-brand-700 transition-colors mr-3 p-1" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button onclick="window.deleteFuneral(${f.id})" class="text-red-400 hover:text-red-600 transition-colors p-1" title="Delete"><i class="fa-solid fa-trash"></i></button>
                 </td>
             </tr>
         `;
     }).join('');
 
     const html = `
-        <div class="flex justify-between items-center mb-6">
-            <h3 class="text-xl font-bold text-gray-800">Funeral Events Log</h3>
-            <button onclick="window.showAddFuneralForm()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-gray-400/30">+ Record New Event</button>
+        <div class="flex justify-between items-center mb-5">
+            <div>
+                <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <i class="fa-solid fa-hands-praying text-amber-600"></i> Funeral Events Log
+                </h3>
+                <p class="text-xs text-gray-500 mt-0.5">මරණ සිදුවීම් ලියාපදිංචි කිරීම සහ කළමනාකරණය</p>
+            </div>
+            <button onclick="window.showAddFuneralForm()" class="bg-gray-800 hover:bg-black text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md shadow-gray-400/30 flex items-center gap-1.5 transition-all">
+                <i class="fa-solid fa-plus"></i> Record New Event
+            </button>
         </div>
 
-        <div id="funeralFormContainer" class="hidden mb-6 bg-gray-50 p-6 rounded-2xl border border-gray-200 animate-fade-in">
+        <div id="funeralFormContainer" class="hidden mb-6 bg-gray-50 p-5 rounded-2xl border border-gray-200 animate-fade-in">
             <form onsubmit="window.saveFuneral(event)" class="space-y-4">
                 <input type="hidden" id="fId" value="">
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Event Date</label>
-                        <input type="date" id="fDate" required value="${new Date().toISOString().split('T')[0]}" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 outline-none transition-all">
+                        <label class="block text-xs font-bold text-gray-700 mb-1">මරණ දිනය (Event Date) <span class="text-red-500">*</span></label>
+                        <input type="date" id="fDate" required value="${new Date().toISOString().split('T')[0]}" class="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-brand-500 outline-none text-xs bg-white">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Associated Member</label>
-                        <select id="fMember" required class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 outline-none transition-all bg-white">
-                            <option value="" disabled selected>Select Member</option>
-                            ${memOptions}
-                        </select>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">සාමාජිකයා සොයන්න (Search / Select Member) <span class="text-red-500">*</span></label>
+                        <input list="funeralMembersDatalist" id="fMemberInput" required oninput="window.handleFuneralMemberSelection(this.value)" onchange="window.handleFuneralMemberSelection(this.value)" class="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-brand-500 outline-none text-xs bg-white" placeholder="නම හෝ අංකය Type කරන්න..." autocomplete="off">
+                        <input type="hidden" id="fMember" value="" required>
+                        <datalist id="funeralMembersDatalist">
+                            ${memDatalistOptions}
+                        </datalist>
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Description / Note</label>
-                    <textarea id="fDesc" rows="2" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-brand-500 outline-none transition-all resize-none" placeholder="Details about the funeral..."></textarea>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">විස්තරය / ඥාතීත්වය (Description / Note)</label>
+                    <textarea id="fDesc" rows="2" class="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-brand-500 outline-none text-xs resize-none bg-white" placeholder="උදා: පියා / මව / නැන්දම්මා..."></textarea>
                 </div>
-                <div class="flex justify-end gap-3 text-sm">
-                    <button type="button" onclick="window.showAddFuneralForm(false)" class="text-gray-500 font-bold px-4 py-2">Cancel</button>
-                    <button type="submit" id="fSubmitBtn" class="bg-brand-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-brand-500/30">Save Event Record</button>
+                <div class="flex items-center gap-2">
+                    <label class="flex items-center gap-2 text-xs font-bold text-gray-700 cursor-pointer">
+                        <input type="checkbox" id="fAtapirikaraGiven" class="rounded text-emerald-600 focus:ring-emerald-500">
+                        <span>තුන්මාසේ දානයට අටපිරිකර ලබා දී ඇත (Atapirikara Given)</span>
+                    </label>
+                </div>
+                <div class="flex justify-end gap-2 text-xs pt-2">
+                    <button type="button" onclick="window.showAddFuneralForm(false)" class="text-gray-500 font-bold px-4 py-2 hover:bg-gray-100 rounded-lg">Cancel</button>
+                    <button type="submit" id="fSubmitBtn" class="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2 rounded-xl font-bold shadow-md shadow-brand-500/30">Save Event Record</button>
                 </div>
             </form>
         </div>
 
-        <div class="max-h-[50vh] overflow-auto rounded-xl border border-gray-200 custom-scrollbar">
+        <div class="max-h-[55vh] overflow-auto rounded-xl border border-gray-200 custom-scrollbar">
             <table class="w-full text-left">
-                <thead class="bg-gray-100 sticky top-0">
+                <thead class="bg-gray-100 sticky top-0 text-gray-700 text-[11px] uppercase tracking-wider">
                     <tr>
-                        <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Date</th>
-                        <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Member Home</th>
-                        <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Description</th>
-                        <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase text-right">Actions</th>
+                        <th class="px-4 py-3 font-bold">මරණ දිනය</th>
+                        <th class="px-4 py-3 font-bold">සාමාජික නිවස</th>
+                        <th class="px-4 py-3 font-bold">විස්තරය</th>
+                        <th class="px-4 py-3 font-bold">තුන්මාසේ දාන දිනය</th>
+                        <th class="px-4 py-3 font-bold text-center">අටපිරිකර තත්ත්වය</th>
+                        <th class="px-4 py-3 font-bold text-right">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-50 bg-white">
-                    ${funeralRows || '<tr><td colspan="4" class="text-center py-8 text-gray-400 italic">No funeral events recorded yet.</td></tr>'}
+                <tbody class="divide-y divide-gray-100 bg-white text-xs">
+                    ${funeralRows || '<tr><td colspan="6" class="text-center py-8 text-gray-400 italic">මරණ ලේඛන දත්ත ඇතුලත් කර නැත.</td></tr>'}
                 </tbody>
             </table>
         </div>
@@ -1578,6 +1726,12 @@ window.showAddFuneralForm = (show = true) => {
     
     if (show) {
         document.getElementById('fId').value = '';
+        const memberInput = document.getElementById('fMemberInput');
+        if (memberInput) memberInput.value = '';
+        const hiddenMember = document.getElementById('fMember');
+        if (hiddenMember) hiddenMember.value = '';
+        const chk = document.getElementById('fAtapirikaraGiven');
+        if (chk) chk.checked = false;
         document.getElementById('fSubmitBtn').textContent = 'Save Event Record';
         el.classList.remove('hidden');
     } else {
@@ -1589,11 +1743,22 @@ window.editFuneral = async (id) => {
     const f = await db.funerals.get(id);
     if (!f) return;
 
+    if (!document.getElementById('funeralFormContainer')) {
+        await window.openFuneralModal();
+    }
+
     window.showAddFuneralForm(true);
     document.getElementById('fId').value = f.id;
     document.getElementById('fDate').value = f.date;
+    const m = window._funeralMembersCache?.find(mem => mem.id === f.memberId) || (await db.members.get(f.memberId));
+    const memberInput = document.getElementById('fMemberInput');
+    if (memberInput) {
+        memberInput.value = m ? (m.memberNo ? m.memberNo + ' - ' : '') + m.name : '';
+    }
     document.getElementById('fMember').value = f.memberId;
     document.getElementById('fDesc').value = f.description || '';
+    const chk = document.getElementById('fAtapirikaraGiven');
+    if (chk) chk.checked = !!f.atapirikaraGiven;
     document.getElementById('fSubmitBtn').textContent = 'Update Event Record';
 };
 
@@ -1602,10 +1767,26 @@ window.saveFuneral = async (e) => {
     try {
         const id = document.getElementById('fId').value;
         const date = document.getElementById('fDate').value;
-        const memberId = parseInt(document.getElementById('fMember').value);
-        const description = document.getElementById('fDesc').value;
+        let memberId = parseInt(document.getElementById('fMember').value);
+        
+        // If hidden fMember is empty, attempt to resolve from fMemberInput
+        if (!memberId) {
+            const typedVal = document.getElementById('fMemberInput')?.value;
+            if (typedVal) {
+                window.handleFuneralMemberSelection(typedVal);
+                memberId = parseInt(document.getElementById('fMember').value);
+            }
+        }
 
-        const data = { date, memberId, description };
+        if (!memberId) {
+            window.utils.showToast("කරුණාකර සාමාජිකයෙකු තෝරන්න (Select a valid member)", "error");
+            return;
+        }
+
+        const description = document.getElementById('fDesc').value;
+        const atapirikaraGiven = document.getElementById('fAtapirikaraGiven')?.checked || false;
+
+        const data = { date, memberId, description, atapirikaraGiven };
 
         if (id) {
             await db.funerals.update(parseInt(id), data);
@@ -1616,6 +1797,8 @@ window.saveFuneral = async (e) => {
         }
         
         window.openFuneralModal(); // Refresh
+        if (typeof window.loadFuneralsViewTable === 'function') window.loadFuneralsViewTable();
+        if (window.refreshCurrentView) window.refreshCurrentView();
     } catch (err) {
         console.error(err);
         window.utils.showToast("Error saving event", "error");
@@ -1629,8 +1812,1256 @@ window.deleteFuneral = async (id) => {
         async () => {
             await db.funerals.delete(id);
             window.openFuneralModal();
+            if (typeof window.loadFuneralsViewTable === 'function') window.loadFuneralsViewTable();
+            if (window.refreshCurrentView) window.refreshCurrentView();
         },
         "Confirm Remove",
         "warning"
     );
 };
+
+// ==========================================
+// FUNERALS & 3-MONTH REMINDERS FULL VIEW
+// ==========================================
+
+window.renderFuneralsView = async () => {
+    return `
+        <div class="glass-panel p-6 rounded-2xl h-full flex flex-col">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                <div>
+                    <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                        <i class="fa-solid fa-hands-praying text-rose-500"></i> මරණ ලේඛනය සහ තුන්මාසේ දාන (Funerals & 3-Month Reminders)
+                    </h3>
+                    <p class="text-sm text-gray-500">මරණ සිදුවීම් ලියාපදිංචිය, තුන්මාසයේ දානමය පින්කම් සහ අටපිරිකර සිහිකැඳවීම් කළමනාකරණය</p>
+                </div>
+            </div>
+
+            <!-- Active 3-Month Reminders Banner -->
+            <div id="funeralViewRemindersContainer" class="mb-6">
+                <!-- Injected by mountFuneralsView -->
+            </div>
+
+            <!-- Quick Filters & Search -->
+            <div class="mb-6 flex flex-wrap gap-3 items-center">
+                <div class="flex-1 min-w-[200px] relative">
+                    <i class="fa-solid fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                    <input type="text" id="funeralSearch" placeholder="සාමාජික නම, අංකය හෝ විස්තරය සොයන්න..." class="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 focus:border-brand-500 bg-white/70 text-xs outline-none shadow-sm">
+                </div>
+                <select id="funeralFilterStatus" onchange="window.loadFuneralsViewTable()" class="px-3 py-2 rounded-xl border border-gray-200 focus:border-brand-500 bg-white/70 text-xs font-medium outline-none shadow-sm">
+                    <option value="all">සියලුම මරණ (All Funerals)</option>
+                    <option value="upcoming">🔔 ඉදිරි තුන්මාසේ දාන (Upcoming 3-Month)</option>
+                    <option value="pending">⏳ අටපිරිකර ලබාදීමට ඇති (Pending Atapirikara)</option>
+                    <option value="given">✅ අටපිරිකර ලබාදුන් (Given Atapirikara)</option>
+                </select>
+            </div>
+
+            <!-- Table -->
+            <div class="flex-1 overflow-auto rounded-xl border border-gray-100 bg-white/50 custom-scrollbar">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-gray-50/80 sticky top-0 backdrop-blur-md z-10 text-gray-600 text-xs font-bold uppercase tracking-wider">
+                        <tr>
+                            <th class="px-6 py-4 border-b border-gray-100">මරණ දිනය</th>
+                            <th class="px-6 py-4 border-b border-gray-100">සාමාජික නිවස</th>
+                            <th class="px-6 py-4 border-b border-gray-100">විස්තරය</th>
+                            <th class="px-6 py-4 border-b border-gray-100">තුන්මාසේ දාන දිනය</th>
+                            <th class="px-6 py-4 border-b border-gray-100 text-center">අටපිරිකර තත්ත්වය</th>
+                            <th class="px-6 py-4 border-b border-gray-100 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="funeralsViewTableBody" class="divide-y divide-gray-100 text-xs">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+};
+
+window.mountFuneralsView = async () => {
+    window.loadFuneralsViewTable();
+
+    const searchInput = document.getElementById('funeralSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            window.loadFuneralsViewTable();
+        });
+    }
+};
+
+window.loadFuneralsViewTable = async () => {
+    const tbody = document.getElementById('funeralsViewTableBody');
+    const remindersContainer = document.getElementById('funeralViewRemindersContainer');
+    if (!tbody) return;
+
+    const searchQuery = (document.getElementById('funeralSearch')?.value || '').toLowerCase().trim();
+    const filterStatus = document.getElementById('funeralFilterStatus')?.value || 'all';
+
+    const members = await db.members.toArray();
+    let funerals = (await db.funerals.toArray()).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // Calculate status for all funerals
+    const funeralsWithInfo = funerals.map(f => {
+        const m = members.find(mem => mem.id === f.memberId);
+        const st = window.get3MonthAlmsgivingStatus(f.date, f.atapirikaraGiven);
+        return { funeral: f, member: m, st };
+    });
+
+    // Reminders Banner
+    const upcomingReminders = funeralsWithInfo.filter(item => item.st.isUrgent && !item.funeral.atapirikaraGiven);
+    if (remindersContainer) {
+        if (upcomingReminders.length > 0) {
+            remindersContainer.innerHTML = `
+                <div class="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border-2 border-amber-300 rounded-2xl p-4 shadow-sm animate-fade-in">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2 text-amber-900 font-black text-xs">
+                            <div class="w-6 h-6 rounded-lg bg-amber-500 text-white flex items-center justify-center text-xs animate-bounce shadow-sm">
+                                <i class="fa-solid fa-bell"></i>
+                            </div>
+                            <span>ඉදිරි සති 2 ඇතුලත තුන්මාසේ දානමය පින්කම් සහ අටපිරිකර සිහිකැඳවීම් (Active Reminders)</span>
+                        </div>
+                        <span class="bg-amber-200 text-amber-900 px-2.5 py-0.5 rounded-full text-[10px] font-black">${upcomingReminders.length} ක් ඇත</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                        ${upcomingReminders.map(item => `
+                            <div class="bg-white p-3 rounded-xl border border-amber-200 shadow-sm flex justify-between items-center gap-2">
+                                <div>
+                                    <div class="font-bold text-gray-900 text-xs">${item.member ? `${item.member.memberNo} - ${item.member.name}` : 'Unknown Member'}</div>
+                                    <div class="text-[11px] text-gray-500 font-medium">මරණ දිනය: <strong>${window.utils.formatDate(item.funeral.date)}</strong> &rarr; තුන්මාසේ: <strong class="text-amber-800">${window.utils.formatDate(item.st.targetDate)}</strong></div>
+                                    <div class="mt-1 inline-block px-2 py-0.5 rounded text-[10px] font-bold ${item.st.badgeClass}">${item.st.text}</div>
+                                </div>
+                                <button type="button" onclick="window.toggleAtapirikaraGivenInView(${item.funeral.id})" class="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg shadow-sm transition-all flex items-center gap-1">
+                                    <i class="fa-solid fa-check"></i> අටපිරිකර ලබාදුන්නා
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            remindersContainer.classList.remove('hidden');
+        } else {
+            remindersContainer.innerHTML = '';
+            remindersContainer.classList.add('hidden');
+        }
+    }
+
+    // Apply Filter
+    let filtered = funeralsWithInfo;
+    if (filterStatus === 'upcoming') {
+        filtered = filtered.filter(item => item.st.isUrgent && !item.funeral.atapirikaraGiven);
+    } else if (filterStatus === 'pending') {
+        filtered = filtered.filter(item => !item.funeral.atapirikaraGiven);
+    } else if (filterStatus === 'given') {
+        filtered = filtered.filter(item => item.funeral.atapirikaraGiven);
+    }
+
+    // Apply Search
+    if (searchQuery) {
+        filtered = filtered.filter(item => {
+            const mName = (item.member?.name || '').toLowerCase();
+            const mNo = (item.member?.memberNo || '').toString().toLowerCase();
+            const desc = (item.funeral.description || '').toLowerCase();
+            return mName.includes(searchQuery) || mNo.includes(searchQuery) || desc.includes(searchQuery);
+        });
+    }
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-gray-400 italic">මරණ හෝ සිහිකැඳවීම් වාර්තා සොයාගත නොහැක.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(item => {
+        const f = item.funeral;
+        const m = item.member;
+        const st = item.st;
+        return `
+            <tr class="hover:bg-brand-50/40 transition-colors">
+                <td class="px-6 py-4 font-bold text-gray-700 whitespace-nowrap">${window.utils.formatDate(f.date)}</td>
+                <td class="px-6 py-4 font-black text-gray-900">
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-xs">
+                            ${(m?.name || 'U').charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <div>${m ? m.name : 'Unknown Member'}</div>
+                            ${m?.memberNo ? `<div class="text-[10px] text-gray-400 font-bold">No: ${m.memberNo}</div>` : ''}
+                        </div>
+                    </div>
+                </td>
+                <td class="px-6 py-4 text-gray-600">${f.description || '-'}</td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="font-black text-gray-800">${window.utils.formatDate(st.targetDate)}</div>
+                    <div class="inline-block px-2 py-0.5 rounded text-[10px] font-bold mt-0.5 ${st.badgeClass}">${st.text}</div>
+                </td>
+                <td class="px-6 py-4 text-center whitespace-nowrap">
+                    <button type="button" onclick="window.toggleAtapirikaraGivenInView(${f.id})" class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${f.atapirikaraGiven ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100' : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'} flex items-center gap-1.5 mx-auto shadow-sm" title="අටපිරිකර ලබාදීම සලකුණු කරන්න">
+                        <i class="fa-solid ${f.atapirikaraGiven ? 'fa-circle-check text-emerald-600' : 'fa-clock text-amber-600'}"></i>
+                        <span>${f.atapirikaraGiven ? 'ලබාදී ඇත (Given)' : 'ලබාදීමට ඇත (Pending)'}</span>
+                    </button>
+                </td>
+                <td class="px-6 py-4 text-right whitespace-nowrap space-x-1">
+                    <button onclick="window.editFuneral(${f.id})" class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors p-1" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                    <button onclick="window.deleteFuneral(${f.id})" class="w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors p-1" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+};
+
+window.toggleAtapirikaraGivenInView = async (funeralId) => {
+    const f = await db.funerals.get(funeralId);
+    if (!f) return;
+    const newState = !f.atapirikaraGiven;
+    await db.funerals.update(funeralId, {
+        atapirikaraGiven: newState,
+        atapirikaraGivenDate: newState ? new Date().toISOString().split('T')[0] : null
+    });
+    window.utils.showToast(newState ? "අටපිරිකර ලබාදුන් බව සටහන් විය (Marked as Given)" : "අටපිරිකර ලබාදීම Pending ලෙස සටහන් විය");
+    window.loadFuneralsViewTable();
+    if (window.updateFuneralsNavBadge) window.updateFuneralsNavBadge();
+};
+
+// ==========================================
+// ADVANCE LOAN (අත්තිකාරම් ණය) SETTLEMENT & RENEWAL
+// ==========================================
+
+window.getAccountBalance = async (accountId) => {
+    if (!accountId) return 0;
+    const acc = await db.accounts.get(parseInt(accountId));
+    if (!acc) return 0;
+    const entries = await db.entries.where('accountId').equals(acc.id).toArray();
+    let debit = 0;
+    let credit = 0;
+    for (let e of entries) {
+        const tx = await db.transactions.get(e.transactionId);
+        if (tx && tx.status !== 'Cancelled') {
+            debit += parseFloat(e.debit) || 0;
+            credit += parseFloat(e.credit) || 0;
+        }
+    }
+    if (acc.accountType === 'Asset' || acc.accountType === 'Expense') {
+        return debit - credit;
+    } else {
+        return credit - debit;
+    }
+};
+
+window.openAdvanceLoanModal = async (preselectedAccId = null, initialTab = 'settle') => {
+    const accounts = (await db.accounts.toArray()).filter(a => (a.unit || 'Main') === window.currentUnit);
+    
+    // Loan Accounts (Liability accounts, specially ones with 'අත්තිකාරම්' or 'ණය' or 'Loan')
+    const loanAccounts = accounts.filter(a => a.accountType === 'Liability' || (a.accountName && (a.accountName.includes('අත්තිකාරම්') || a.accountName.includes('ණය') || a.accountName.toLowerCase().includes('loan'))));
+    
+    // Cash & Bank accounts (Assets for payments)
+    const cashBankAccounts = accounts.filter(a =>
+        a.accountType === 'Asset' &&
+        (a.accountName.toLowerCase().includes('cash') || a.accountName.toLowerCase().includes('bank') || a.accountName.includes('මුදල් පොත') || a.accountName.includes('තැන්පතු') || a.category === 'Current Asset')
+    );
+
+    // Fixed Deposit Accounts (Assets)
+    const fdAccounts = accounts.filter(a =>
+        a.accountType === 'Asset' &&
+        (a.accountName.includes('තැන්පතු') || a.accountName.includes('තැන්පත්') || a.accountName.includes('ස්ථාවර') || a.accountName.toLowerCase().includes('deposit') || a.accountName.toLowerCase().includes('fixed'))
+    );
+
+    // Interest Expense Accounts
+    let intExpenseAccounts = accounts.filter(a => a.accountType === 'Expense');
+    let defaultIntExpAcc = accounts.find(a => a.accountName === 'ණය පොලී වියදම්' || a.accountName.includes('පොලී වියදම්'));
+    if (!defaultIntExpAcc && intExpenseAccounts.length > 0) defaultIntExpAcc = intExpenseAccounts[0];
+
+    // FD Interest Income Accounts
+    let fdIncomeAccounts = accounts.filter(a => a.accountType === 'Income');
+    let defaultFdIncAcc = accounts.find(a => a.accountName === 'ස්ථාවර තැන්පතු පොලී ආදායම' || a.accountName.includes('පොලී ආදායම'));
+    if (!defaultFdIncAcc && fdIncomeAccounts.length > 0) defaultFdIncAcc = fdIncomeAccounts[0];
+
+    const loanAccOptions = loanAccounts.map(a => `<option value="${a.id}" ${preselectedAccId == a.id ? 'selected' : ''}>${a.accountName}</option>`).join('');
+    const cashBankOptions = cashBankAccounts.map(a => `<option value="${a.id}">${a.accountName}</option>`).join('');
+    const fdOptions = fdAccounts.map(a => `<option value="${a.id}">${a.accountName}</option>`).join('');
+    const intExpOptions = intExpenseAccounts.map(a => `<option value="${a.id}" ${defaultIntExpAcc && defaultIntExpAcc.id === a.id ? 'selected' : ''}>${a.accountName}</option>`).join('');
+    const fdIncOptions = fdIncomeAccounts.map(a => `<option value="${a.id}" ${defaultFdIncAcc && defaultFdIncAcc.id === a.id ? 'selected' : ''}>${a.accountName}</option>`).join('');
+
+    window.loanGlobalCashBankOptions = cashBankAccounts.map(a => `<option value="${a.id}">${a.accountName}</option>`).join('');
+
+    const defaultDate = new Date().toISOString().split('T')[0];
+
+    const html = `
+        <div class="space-y-4">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between pb-3 border-b border-gray-100">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-xl shadow-sm">
+                        <i class="fa-solid fa-hand-holding-dollar"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-800 leading-tight">ස්ථාවර තැන්පතු අත්තිකාරම් ණය</h3>
+                        <p class="text-xs text-gray-500">ණය පියවීම සහ වාර්ෂිකව අලුත් කිරීම (Settlement & Renewal)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="flex bg-gray-100 p-1 rounded-xl">
+                <button type="button" id="tabBtnSettle" onclick="window.switchLoanTab('settle')" class="flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${initialTab === 'settle' ? 'bg-white text-amber-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'} flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-check-to-slot"></i> 1. ණය පියවීම (Loan Settlement)
+                </button>
+                <button type="button" id="tabBtnRenew" onclick="window.switchLoanTab('renew')" class="flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${initialTab === 'renew' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'} flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-arrows-rotate"></i> 2. ණය අලුත් කිරීම (Loan Renewal)
+                </button>
+            </div>
+
+            <!-- ============================================== -->
+            <!-- TAB 1: ණය පියවීම (LOAN SETTLEMENT) -->
+            <!-- ============================================== -->
+            <div id="loanTabSettle" class="${initialTab === 'settle' ? '' : 'hidden'} space-y-4">
+                <form id="loanSettleForm" class="space-y-4" onsubmit="window.saveAdvanceLoanSettlement(event, false)">
+                    <div class="bg-amber-50/60 border border-amber-200/80 rounded-xl p-4 space-y-3">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1">අත්තිකාරම් ණය ගිණුම (Advance Loan Account) <span class="text-red-500">*</span></label>
+                            <select id="lsLoanAcc" required onchange="window.handleLoanAccountChange(this.value, 'settle')" class="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none bg-white font-medium text-sm">
+                                <option value="" disabled ${!preselectedAccId ? 'selected' : ''}>තෝරන්න (Select Loan Account)</option>
+                                ${loanAccOptions}
+                            </select>
+                        </div>
+                        <div class="flex justify-between items-center bg-white px-3 py-2 rounded-lg border border-amber-100 text-xs">
+                            <span class="text-gray-500 font-medium">දැනට පවතින ණය ශේෂය (Current Outstanding):</span>
+                            <span id="lsCurrentBalDisplay" class="font-black text-amber-700 text-sm">Rs. 0.00</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1">දිනය (Date) <span class="text-red-500">*</span></label>
+                            <input type="date" id="lsDate" required value="${defaultDate}" class="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-amber-500 outline-none bg-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1">යොමු අංකය (Reference No)</label>
+                            <input type="text" id="lsRef" class="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-amber-500 outline-none bg-white text-sm font-bold text-amber-600" placeholder="e.g. LN-SET-000001">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1">පියවන ණය මුදල (Principal Amount) <span class="text-red-500">*</span></label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">Rs.</span>
+                                <input type="number" id="lsPrincipal" required step="0.01" min="0.01" oninput="window.updateLoanSettleSummary(true)" placeholder="0.00" class="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-300 focus:border-amber-500 outline-none text-right font-bold text-gray-800 text-sm bg-white">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1">ගෙවන පොලී මුදල (Interest Amount)</label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">Rs.</span>
+                                <input type="number" id="lsInterest" step="0.01" min="0.00" value="0.00" oninput="window.updateLoanSettleSummary(true)" placeholder="0.00" class="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-300 focus:border-amber-500 outline-none text-right font-bold text-red-600 text-sm bg-white">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">පොලී වියදම් ගිණුම (Interest Account)</label>
+                        <select id="lsIntAcc" class="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-amber-500 outline-none bg-white text-xs">
+                            ${intExpOptions}
+                        </select>
+                    </div>
+
+                    <!-- MULTIPLE PAYMENT SOURCE ACCOUNTS SECTION -->
+                    <div class="border border-amber-200 bg-amber-50/40 rounded-xl p-3.5 space-y-2.5">
+                        <div class="flex justify-between items-center">
+                            <label class="block text-xs font-bold text-gray-800">
+                                <i class="fa-solid fa-wallet text-amber-600 mr-1"></i> ගෙවීම් සිදුකරන ගිණුම් (Paid From Accounts) <span class="text-red-500">*</span>
+                            </label>
+                            <button type="button" onclick="window.addLoanPaymentSourceRow()" class="text-[11px] text-amber-800 font-bold bg-amber-200/80 hover:bg-amber-300 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors border border-amber-300 shadow-sm">
+                                <i class="fa-solid fa-plus"></i> තවත් ගිණුමක් (Add Account)
+                            </button>
+                        </div>
+                        <p class="text-[10px] text-gray-500">ගෙවීම් සිදුකරන්නේ ගිණුම් කිහිපයකින් නම් "තවත් ගිණුමක්" ක්ලික් කර අදාළ ගිණුම් සහ මුදල් වෙන් කරන්න.</p>
+                        
+                        <div id="lsPaymentSourcesContainer" class="space-y-2 pt-1">
+                            <!-- Populated dynamically with at least 1 row -->
+                        </div>
+                        
+                        <div class="flex justify-between items-center bg-white px-3 py-1.5 rounded-lg border border-amber-100 text-xs mt-2">
+                            <span class="text-gray-500 font-medium">මුළු වෙන්කළ ගෙවීම් ශේෂය (Total Allocated):</span>
+                            <span id="lsAllocatedTotalDisplay" class="font-black text-gray-800">Rs. 0.00</span>
+                        </div>
+                        <div id="lsAllocationDiffAlert" class="hidden text-[11px] font-bold text-red-600 bg-red-50 px-2.5 py-1.5 rounded border border-red-200"></div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">විස්තරය (Narration / Description)</label>
+                        <input type="text" id="lsDesc" class="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-amber-500 outline-none bg-white text-xs" placeholder="අත්තිකාරම් ණය සහ පොලිය පියවීම...">
+                    </div>
+
+                    <!-- Live Calculation Summary -->
+                    <div class="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-1.5 text-xs">
+                        <div class="flex justify-between text-gray-600">
+                            <span>පියවන ණය මුදල (Principal Paid):</span>
+                            <span class="font-bold" id="lsSumPrincipal">Rs. 0.00</span>
+                        </div>
+                        <div class="flex justify-between text-gray-600">
+                            <span>ගෙවන පොලී මුදල (Interest Paid):</span>
+                            <span class="font-bold text-red-600" id="lsSumInterest">Rs. 0.00</span>
+                        </div>
+                        <div class="flex justify-between text-sm font-black text-gray-900 border-t border-gray-200 pt-1.5">
+                            <span>ගෙවිය යුතු මුළු මුදල (Total Outflow Required):</span>
+                            <span class="text-amber-700" id="lsSumTotal">Rs. 0.00</span>
+                        </div>
+                    </div>
+
+                    <div class="pt-3 border-t border-gray-100 flex flex-wrap justify-end gap-2">
+                        <button type="button" onclick="window.utils.closeModal()" class="px-4 py-2 rounded-lg text-gray-600 font-medium hover:bg-gray-100 text-xs">Cancel</button>
+                        <button type="button" onclick="window.saveAdvanceLoanSettlement(event, true)" class="bg-gray-800 hover:bg-black text-white px-4 py-2 rounded-lg font-bold transition-all shadow-md text-xs flex items-center gap-1.5">
+                            <i class="fa-solid fa-print"></i> Save & Print
+                        </button>
+                        <button type="submit" class="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2 rounded-lg font-bold transition-all shadow-md shadow-amber-500/30 text-xs flex items-center gap-1.5">
+                            <i class="fa-solid fa-check"></i> Save Settlement
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- ============================================== -->
+            <!-- TAB 2: ණය අලුත් කිරීම (LOAN RENEWAL / ROLLOVER) -->
+            <!-- ============================================== -->
+            <div id="loanTabRenew" class="${initialTab === 'renew' ? '' : 'hidden'} space-y-4">
+                <form id="loanRenewForm" class="space-y-4" onsubmit="window.saveAdvanceLoanRenewal(event, false)">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div class="bg-blue-50/60 border border-blue-200/80 rounded-xl p-3 space-y-2">
+                            <label class="block text-xs font-bold text-gray-700">අත්තිකාරම් ණය ගිණුම <span class="text-red-500">*</span></label>
+                            <select id="lrLoanAcc" required onchange="window.handleLoanAccountChange(this.value, 'renew')" class="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 focus:border-blue-500 outline-none bg-white font-medium text-xs">
+                                <option value="" disabled ${!preselectedAccId ? 'selected' : ''}>තෝරන්න (Loan Account)</option>
+                                ${loanAccOptions}
+                            </select>
+                            <div class="flex justify-between text-[11px] bg-white px-2.5 py-1 rounded border border-blue-100">
+                                <span class="text-gray-500">දැනට ණය ශේෂය:</span>
+                                <span id="lrCurrentBalDisplay" class="font-black text-blue-700">Rs. 0.00</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-3 space-y-2">
+                            <label class="block text-xs font-bold text-gray-700">අදාළ ස්ථාවර තැන්පතුව (Linked FD)</label>
+                            <select id="lrFdAcc" onchange="window.handleLoanFdAccountChange(this.value)" class="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 focus:border-emerald-500 outline-none bg-white font-medium text-xs">
+                                <option value="">තෝරන්න (Fixed Deposit)</option>
+                                ${fdOptions}
+                            </select>
+                            <div class="flex justify-between text-[11px] bg-white px-2.5 py-1 rounded border border-emerald-100">
+                                <span class="text-gray-500">තැන්පතු ශේෂය:</span>
+                                <span id="lrFdBalDisplay" class="font-black text-emerald-700">Rs. 0.00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1">අලුත් කළ දිනය (Renewal Date) <span class="text-red-500">*</span></label>
+                            <input type="date" id="lrDate" required value="${defaultDate}" class="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-blue-500 outline-none bg-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1">යොමු අංකය (Reference No)</label>
+                            <input type="text" id="lrRef" class="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-blue-500 outline-none bg-white text-sm font-bold text-blue-600" placeholder="e.g. LN-RNW-000001">
+                        </div>
+                    </div>
+
+                    <!-- 1. Loan Interest Payment Section -->
+                    <div class="border border-red-200 bg-red-50/40 rounded-xl p-3.5 space-y-3">
+                        <div class="flex items-center gap-2 text-xs font-bold text-red-800">
+                            <i class="fa-solid fa-receipt"></i> 1. ණය සඳහා පොලිය ගෙවීම (Loan Interest Paid)
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-700 mb-1">ගෙවූ මුළු පොලී මුදල (Rs.) <span class="text-red-500">*</span></label>
+                                <input type="number" id="lrLoanIntAmount" required step="0.01" min="0.00" value="0.00" oninput="window.updateLoanRenewSummary(true)" class="w-full px-3 py-1.5 rounded-lg border border-gray-300 focus:border-red-500 outline-none text-right font-bold text-red-600 text-xs bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-700 mb-1">පොලී වියදම් ගිණුම</label>
+                                <select id="lrLoanIntAcc" class="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 focus:border-red-500 outline-none bg-white text-xs">
+                                    ${intExpOptions}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- MULTIPLE PAYMENT ACCOUNTS FOR RENEWAL INTEREST -->
+                        <div class="pt-1 space-y-2">
+                            <div class="flex justify-between items-center">
+                                <label class="block text-[11px] font-bold text-gray-800">
+                                    <i class="fa-solid fa-wallet text-red-600 mr-1"></i> පොලිය ගෙවූ ගිණුම් (Interest Paid From Accounts)
+                                </label>
+                                <button type="button" onclick="window.addLoanRenewPaymentSourceRow()" class="text-[10px] text-red-800 font-bold bg-red-200/80 hover:bg-red-300 px-2 py-0.5 rounded-lg flex items-center gap-1 transition-colors border border-red-300 shadow-sm">
+                                    <i class="fa-solid fa-plus"></i> තවත් ගිණුමක් (Add Account)
+                                </button>
+                            </div>
+                            
+                            <div id="lrPaymentSourcesContainer" class="space-y-2">
+                                <!-- Populated dynamically with at least 1 row -->
+                            </div>
+                            
+                            <div class="flex justify-between items-center bg-white px-3 py-1.5 rounded-lg border border-red-100 text-xs">
+                                <span class="text-gray-500 font-medium">වෙන්කළ මුළු පොලී මුදල:</span>
+                                <span id="lrAllocatedTotalDisplay" class="font-black text-gray-800">Rs. 0.00</span>
+                            </div>
+                            <div id="lrAllocationDiffAlert" class="hidden text-[11px] font-bold text-red-600 bg-red-50 px-2.5 py-1.5 rounded border border-red-200"></div>
+                        </div>
+                    </div>
+
+                    <!-- 2. FD Interest Addition Section -->
+                    <div class="border border-emerald-200 bg-emerald-50/40 rounded-xl p-3 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <label class="flex items-center gap-2 text-xs font-bold text-emerald-800 cursor-pointer">
+                                <input type="checkbox" id="lrFdInterestToggle" onchange="window.toggleFdInterestSection(this.checked)" class="rounded text-emerald-600 focus:ring-emerald-500">
+                                <span><i class="fa-solid fa-arrow-trend-up"></i> 2. ස්ථාවර තැන්පතුවට පොලී එකතු වීම (Add FD Interest to Principal)</span>
+                            </label>
+                        </div>
+                        <div id="lrFdInterestBox" class="grid grid-cols-1 md:grid-cols-2 gap-3 opacity-40 pointer-events-none transition-all">
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-700 mb-1">ලැබුණු තැන්පතු පොලිය (Rs.)</label>
+                                <input type="number" id="lrFdIntAmount" step="0.01" min="0.00" value="0.00" oninput="window.updateLoanRenewSummary()" class="w-full px-3 py-1.5 rounded-lg border border-gray-300 focus:border-emerald-500 outline-none text-right font-bold text-emerald-700 text-xs bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-700 mb-1">පොලී ආදායම් ගිණුම (Income Account)</label>
+                                <select id="lrFdIntAcc" class="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 focus:border-emerald-500 outline-none bg-white text-xs">
+                                    ${fdIncOptions}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Principal Adjustment Section -->
+                    <div class="border border-blue-200 bg-blue-50/40 rounded-xl p-3 space-y-3">
+                        <div class="text-xs font-bold text-blue-800 flex items-center gap-2">
+                            <i class="fa-solid fa-sliders"></i> 3. ණය මුදල වෙනස් කිරීම (Principal Adjustment - Optional)
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 text-xs">
+                            <label class="flex items-center gap-1.5 bg-white p-2 rounded-lg border border-gray-200 cursor-pointer">
+                                <input type="radio" name="lrAdjMode" value="none" checked onchange="window.togglePrincipalAdjMode('none')">
+                                <span class="font-medium text-gray-700 text-[11px]">වෙනසක් නැත</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 bg-white p-2 rounded-lg border border-gray-200 cursor-pointer">
+                                <input type="radio" name="lrAdjMode" value="topup" onchange="window.togglePrincipalAdjMode('topup')">
+                                <span class="font-medium text-blue-700 text-[11px]">ණය මුදල වැඩි කිරීම</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 bg-white p-2 rounded-lg border border-gray-200 cursor-pointer">
+                                <input type="radio" name="lrAdjMode" value="repay" onchange="window.togglePrincipalAdjMode('repay')">
+                                <span class="font-medium text-amber-700 text-[11px]">ණය මුදල අඩු කිරීම</span>
+                            </label>
+                        </div>
+                        <div id="lrAdjInputBox" class="hidden grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                            <div>
+                                <label id="lrAdjAmountLabel" class="block text-[11px] font-bold text-gray-700 mb-1">මුදල (Rs.)</label>
+                                <input type="number" id="lrAdjAmount" step="0.01" min="0.00" value="0.00" oninput="window.updateLoanRenewSummary(false)" class="w-full px-3 py-1.5 rounded-lg border border-gray-300 focus:border-blue-500 outline-none text-right font-bold text-xs bg-white text-gray-800">
+                            </div>
+                            <div>
+                                <label id="lrAdjAccountLabel" class="block text-[11px] font-bold text-gray-700 mb-1">මුදල් ගිණුම (Account)</label>
+                                <select id="lrAdjAccount" class="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 focus:border-blue-500 outline-none bg-white text-xs">
+                                    ${cashBankOptions}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- New Loan Account Name for Renewal -->
+                        <div class="pt-2.5 border-t border-blue-200/60 space-y-1.5">
+                            <label class="block text-[11px] font-bold text-gray-800">
+                                <i class="fa-solid fa-file-signature text-blue-600 mr-1"></i> අලුත් ණය ගිණුමේ නම / අංකය (New Loan Account Name / Number) <span class="text-gray-400 font-normal">(වෙනස් වේ නම්)</span>
+                            </label>
+                            <input type="text" id="lrNewLoanAccName" class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-blue-500 outline-none text-xs bg-white font-medium text-gray-800" placeholder="e.g. අත්තිකාරම් ණය ගිණුම 01-3030106-00295">
+                            <div class="flex flex-wrap items-center gap-4 text-[11px] pt-0.5">
+                                <label class="flex items-center gap-1.5 cursor-pointer text-blue-800 font-semibold">
+                                    <input type="radio" name="lrNewAccAction" value="transfer" checked class="text-blue-600 focus:ring-blue-500">
+                                    <span>නව ගිණුමක් සකසා ශේෂය මාරු කරන්න (New Account & Transfer Balance)</span>
+                                </label>
+                                <label class="flex items-center gap-1.5 cursor-pointer text-gray-700 font-medium">
+                                    <input type="radio" name="lrNewAccAction" value="rename" class="text-blue-600 focus:ring-blue-500">
+                                    <span>පවතින ගිණුමේ නම යාවත්කාලීන කරන්න (Rename Existing)</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">විස්තරය (Description)</label>
+                        <input type="text" id="lrDesc" class="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-blue-500 outline-none bg-white text-xs" placeholder="අත්තිකාරම් ණය අලුත් කිරීම සහ පොලී ගෙවීම...">
+                    </div>
+
+                    <!-- Renewal Live Calculation Summary -->
+                    <div class="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-1.5 text-xs">
+                        <div class="flex justify-between text-gray-600">
+                            <span>ණය පොලී ගෙවීම (Interest Paid Outflow):</span>
+                            <span class="font-bold text-red-600" id="lrSumIntPaid">Rs. 0.00</span>
+                        </div>
+                        <div class="flex justify-between text-gray-600">
+                            <span>තැන්පතුවට එකතු කළ පොලිය (FD Growth):</span>
+                            <span class="font-bold text-emerald-600" id="lrSumFdGrowth">Rs. 0.00</span>
+                        </div>
+                        <div class="flex justify-between text-gray-700 border-t border-gray-200 pt-1">
+                            <span>නව ණය ශේෂය (New Loan Balance):</span>
+                            <span class="font-black text-blue-800 text-sm" id="lrSumNewLoanBal">Rs. 0.00</span>
+                        </div>
+                    </div>
+
+                    <div class="pt-3 border-t border-gray-100 flex flex-wrap justify-end gap-2">
+                        <button type="button" onclick="window.utils.closeModal()" class="px-4 py-2 rounded-lg text-gray-600 font-medium hover:bg-gray-100 text-xs">Cancel</button>
+                        <button type="button" onclick="window.saveAdvanceLoanRenewal(event, true)" class="bg-gray-800 hover:bg-black text-white px-4 py-2 rounded-lg font-bold transition-all shadow-md text-xs flex items-center gap-1.5">
+                            <i class="fa-solid fa-print"></i> Save & Print
+                        </button>
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-bold transition-all shadow-md shadow-blue-500/30 text-xs flex items-center gap-1.5">
+                            <i class="fa-solid fa-arrows-rotate"></i> Save Renewal
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+
+    window.utils.showModal(html);
+
+    // Initial triggers
+    requestAnimationFrame(async () => {
+        const nextSetRef = await window.getNextReferenceNumber('LN-SET-');
+        const setRefInput = document.getElementById('lsRef');
+        if (setRefInput) setRefInput.value = nextSetRef;
+
+        const nextRnwRef = await window.getNextReferenceNumber('LN-RNW-');
+        const rnwRefInput = document.getElementById('lrRef');
+        if (rnwRefInput) rnwRefInput.value = nextRnwRef;
+
+        // Initialize with 1 payment source row for both settlement and renewal
+        window.addLoanPaymentSourceRow();
+        window.addLoanRenewPaymentSourceRow();
+
+        if (preselectedAccId) {
+            window.handleLoanAccountChange(preselectedAccId, 'settle');
+            window.handleLoanAccountChange(preselectedAccId, 'renew');
+        }
+    });
+};
+
+window.addLoanPaymentSourceRow = (defaultAccId = null, defaultAmount = null) => {
+    const container = document.getElementById('lsPaymentSourcesContainer');
+    if (!container) return;
+
+    // Calculate remaining unallocated amount to auto-suggest
+    let suggestedAmount = '';
+    if (defaultAmount !== null) {
+        suggestedAmount = defaultAmount;
+    } else {
+        const p = parseFloat(document.getElementById('lsPrincipal')?.value) || 0;
+        const i = parseFloat(document.getElementById('lsInterest')?.value) || 0;
+        const totalReq = p + i;
+        const currentAllocated = Array.from(document.getElementsByName('lsPaidAmount[]')).reduce((sum, el) => sum + (parseFloat(el.value) || 0), 0);
+        const rem = totalReq - currentAllocated;
+        if (rem > 0) suggestedAmount = rem.toFixed(2);
+    }
+
+    const row = document.createElement('div');
+    row.className = "flex items-center gap-2 bg-white p-2 rounded-xl border border-gray-200 relative animate-fade-in";
+    row.innerHTML = `
+        <div class="flex-1">
+            <select name="lsPaidAccount[]" required class="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 focus:border-amber-500 outline-none bg-white font-medium text-xs">
+                <option value="" disabled selected>ගිණුම තෝරන්න (Select Account)</option>
+                ${window.loanGlobalCashBankOptions || ''}
+            </select>
+        </div>
+        <div class="w-1/3 relative">
+            <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[10px] font-bold">Rs.</span>
+            <input type="number" name="lsPaidAmount[]" required step="0.01" min="0.01" value="${suggestedAmount}" placeholder="0.00" oninput="window.updateLoanSettleSummary(false)" class="w-full pl-7 pr-2.5 py-1.5 rounded-lg border border-gray-300 focus:border-amber-500 outline-none text-right font-bold text-xs bg-white text-gray-800">
+        </div>
+        <button type="button" onclick="if(document.getElementsByName('lsPaidAccount[]').length > 1) { this.parentElement.remove(); window.updateLoanSettleSummary(false); } else { window.utils.showToast('අවම වශයෙන් එක් ගෙවීම් ගිණුමක් අවශ්‍ය වේ.', 'error'); }" class="text-red-400 hover:text-red-600 w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 transition-colors" title="ගිණුම ඉවත් කරන්න">
+            <i class="fa-solid fa-trash text-xs"></i>
+        </button>
+    `;
+    container.appendChild(row);
+
+    if (defaultAccId) {
+        const sel = row.querySelector('select');
+        if (sel) sel.value = defaultAccId;
+    }
+
+    window.updateLoanSettleSummary(false);
+};
+
+window.addLoanRenewPaymentSourceRow = (defaultAccId = null, defaultAmount = null) => {
+    const container = document.getElementById('lrPaymentSourcesContainer');
+    if (!container) return;
+
+    let suggestedAmount = '';
+    if (defaultAmount !== null) {
+        suggestedAmount = defaultAmount;
+    } else {
+        const intAmt = parseFloat(document.getElementById('lrLoanIntAmount')?.value) || 0;
+        const currentAllocated = Array.from(document.getElementsByName('lrPaidAmount[]')).reduce((sum, el) => sum + (parseFloat(el.value) || 0), 0);
+        const rem = intAmt - currentAllocated;
+        if (rem > 0) suggestedAmount = rem.toFixed(2);
+    }
+
+    const row = document.createElement('div');
+    row.className = "flex items-center gap-2 bg-white p-2 rounded-xl border border-gray-200 relative animate-fade-in";
+    row.innerHTML = `
+        <div class="flex-1">
+            <select name="lrPaidAccount[]" required class="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 focus:border-red-500 outline-none bg-white font-medium text-xs">
+                <option value="" disabled selected>ගිණුම තෝරන්න (Select Account)</option>
+                ${window.loanGlobalCashBankOptions || ''}
+            </select>
+        </div>
+        <div class="w-1/3 relative">
+            <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[10px] font-bold">Rs.</span>
+            <input type="number" name="lrPaidAmount[]" required step="0.01" min="0.01" value="${suggestedAmount}" placeholder="0.00" oninput="window.updateLoanRenewSummary(false)" class="w-full pl-7 pr-2.5 py-1.5 rounded-lg border border-gray-300 focus:border-red-500 outline-none text-right font-bold text-xs bg-white text-gray-800">
+        </div>
+        <button type="button" onclick="if(document.getElementsByName('lrPaidAccount[]').length > 1) { this.parentElement.remove(); window.updateLoanRenewSummary(false); } else { window.utils.showToast('අවම වශයෙන් එක් ගෙවීම් ගිණුමක් අවශ්‍ය වේ.', 'error'); }" class="text-red-400 hover:text-red-600 w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 transition-colors" title="ගිණුම ඉවත් කරන්න">
+            <i class="fa-solid fa-trash text-xs"></i>
+        </button>
+    `;
+    container.appendChild(row);
+
+    if (defaultAccId) {
+        const sel = row.querySelector('select');
+        if (sel) sel.value = defaultAccId;
+    }
+
+    window.updateLoanRenewSummary(false);
+};
+
+window.switchLoanTab = (tab) => {
+    const settleBox = document.getElementById('loanTabSettle');
+    const renewBox = document.getElementById('loanTabRenew');
+    const btnSettle = document.getElementById('tabBtnSettle');
+    const btnRenew = document.getElementById('tabBtnRenew');
+
+    if (tab === 'settle') {
+        settleBox.classList.remove('hidden');
+        renewBox.classList.add('hidden');
+        btnSettle.className = "flex-1 py-2.5 rounded-lg text-xs font-bold transition-all bg-white text-amber-700 shadow-sm flex items-center justify-center gap-2";
+        btnRenew.className = "flex-1 py-2.5 rounded-lg text-xs font-bold transition-all text-gray-600 hover:text-gray-900 flex items-center justify-center gap-2";
+    } else {
+        settleBox.classList.add('hidden');
+        renewBox.classList.remove('hidden');
+        btnSettle.className = "flex-1 py-2.5 rounded-lg text-xs font-bold transition-all text-gray-600 hover:text-gray-900 flex items-center justify-center gap-2";
+        btnRenew.className = "flex-1 py-2.5 rounded-lg text-xs font-bold transition-all bg-white text-blue-700 shadow-sm flex items-center justify-center gap-2";
+    }
+};
+
+window.handleLoanAccountChange = async (accId, mode) => {
+    if (!accId) return;
+    const balance = await window.getAccountBalance(accId);
+    const acc = await db.accounts.get(parseInt(accId));
+    const accName = acc ? acc.accountName : '';
+
+    if (mode === 'settle') {
+        const balEl = document.getElementById('lsCurrentBalDisplay');
+        if (balEl) balEl.textContent = `Rs. ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const pInput = document.getElementById('lsPrincipal');
+        if (pInput && (!pInput.value || parseFloat(pInput.value) === 0)) {
+            pInput.value = balance > 0 ? balance.toFixed(2) : '0.00';
+        }
+        const descInput = document.getElementById('lsDesc');
+        if (descInput && !descInput.value) {
+            descInput.value = `ස්ථාවර තැන්පතු අත්තිකාරම් ණය පියවීම (${accName})`;
+        }
+        window.updateLoanSettleSummary(true);
+    } else {
+        const balEl = document.getElementById('lrCurrentBalDisplay');
+        if (balEl) balEl.textContent = `Rs. ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const descInput = document.getElementById('lrDesc');
+        if (descInput && !descInput.value) {
+            descInput.value = `ස්ථාවර තැන්පතු අත්තිකාරම් ණය අලුත් කිරීම (${accName})`;
+        }
+        window.updateLoanRenewSummary(false);
+    }
+};
+
+window.handleLoanFdAccountChange = async (accId) => {
+    const balEl = document.getElementById('lrFdBalDisplay');
+    if (!balEl) return;
+    if (!accId) {
+        balEl.textContent = "Rs. 0.00";
+        return;
+    }
+    const balance = await window.getAccountBalance(accId);
+    balEl.textContent = `Rs. ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    window.updateLoanRenewSummary(false);
+};
+
+window.updateLoanSettleSummary = (autoAdjustSingle = false) => {
+    const p = parseFloat(document.getElementById('lsPrincipal')?.value) || 0;
+    const i = parseFloat(document.getElementById('lsInterest')?.value) || 0;
+    const totalRequired = p + i;
+
+    const paidAmtInputs = Array.from(document.getElementsByName('lsPaidAmount[]'));
+    
+    // If only 1 payment source row exists and autoAdjustSingle is true or its value is 0/empty, auto-sync
+    if (paidAmtInputs.length === 1 && (autoAdjustSingle || !paidAmtInputs[0].value || parseFloat(paidAmtInputs[0].value) === 0)) {
+        if (totalRequired > 0) {
+            paidAmtInputs[0].value = totalRequired.toFixed(2);
+        }
+    }
+
+    const allocatedTotal = paidAmtInputs.reduce((sum, el) => sum + (parseFloat(el.value) || 0), 0);
+
+    const sumP = document.getElementById('lsSumPrincipal');
+    const sumI = document.getElementById('lsSumInterest');
+    const sumT = document.getElementById('lsSumTotal');
+    const allocDisplay = document.getElementById('lsAllocatedTotalDisplay');
+    const diffAlert = document.getElementById('lsAllocationDiffAlert');
+
+    if (sumP) sumP.textContent = `Rs. ${p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (sumI) sumI.textContent = `Rs. ${i.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (sumT) sumT.textContent = `Rs. ${totalRequired.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (allocDisplay) allocDisplay.textContent = `Rs. ${allocatedTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    if (diffAlert) {
+        const diff = totalRequired - allocatedTotal;
+        if (totalRequired > 0 && Math.abs(diff) > 0.01) {
+            diffAlert.classList.remove('hidden');
+            if (diff > 0) {
+                diffAlert.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1"></i> ගෙවිය යුතු මුළු මුදලින් තවත් <strong>Rs. ${diff.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> ක් ගිණුම් වලින් වෙන් කළ යුතුය!`;
+            } else {
+                diffAlert.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1"></i> වෙන් කළ මුදල ගෙවිය යුතු මුදලට වඩා <strong>Rs. ${Math.abs(diff).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> කින් වැඩිය!`;
+            }
+        } else {
+            diffAlert.classList.add('hidden');
+        }
+    }
+};
+
+window.toggleFdInterestSection = (enabled) => {
+    const box = document.getElementById('lrFdInterestBox');
+    if (!box) return;
+    if (enabled) {
+        box.classList.remove('opacity-40', 'pointer-events-none');
+    } else {
+        box.classList.add('opacity-40', 'pointer-events-none');
+        const input = document.getElementById('lrFdIntAmount');
+        if (input) input.value = "0.00";
+    }
+    window.updateLoanRenewSummary(false);
+};
+
+window.togglePrincipalAdjMode = (mode) => {
+    const box = document.getElementById('lrAdjInputBox');
+    const labelAmt = document.getElementById('lrAdjAmountLabel');
+    const labelAcc = document.getElementById('lrAdjAccountLabel');
+    if (!box) return;
+
+    if (mode === 'none') {
+        box.classList.add('hidden');
+        const input = document.getElementById('lrAdjAmount');
+        if (input) input.value = "0.00";
+    } else if (mode === 'topup') {
+        box.classList.remove('hidden');
+        if (labelAmt) labelAmt.textContent = "වැඩි කළ ණය මුදල (Top-up Amount Rs.)";
+        if (labelAcc) labelAcc.textContent = "මුදල් ලැබුණු ගිණුම (Receive Into Account)";
+    } else if (mode === 'repay') {
+        box.classList.remove('hidden');
+        if (labelAmt) labelAmt.textContent = "අඩු කළ ණය මුදල (Repay Amount Rs.)";
+        if (labelAcc) labelAcc.textContent = "ගෙවීම සිදුකළ ගිණුම (Paid From Account)";
+    }
+    window.updateLoanRenewSummary(false);
+};
+
+window.updateLoanRenewSummary = async (autoAdjustSingle = false) => {
+    const loanAccId = document.getElementById('lrLoanAcc')?.value;
+    const loanBal = loanAccId ? await window.getAccountBalance(loanAccId) : 0;
+
+    const loanInt = parseFloat(document.getElementById('lrLoanIntAmount')?.value) || 0;
+    const fdInt = parseFloat(document.getElementById('lrFdIntAmount')?.value) || 0;
+
+    const adjMode = document.querySelector('input[name="lrAdjMode"]:checked')?.value || 'none';
+    const adjAmt = parseFloat(document.getElementById('lrAdjAmount')?.value) || 0;
+
+    let newLoanBal = loanBal;
+    if (adjMode === 'topup') newLoanBal += adjAmt;
+    else if (adjMode === 'repay') newLoanBal -= adjAmt;
+
+    // Multi-payment source calculation for renewal loan interest
+    const paidAmtInputs = Array.from(document.getElementsByName('lrPaidAmount[]'));
+    if (paidAmtInputs.length === 1 && (autoAdjustSingle || !paidAmtInputs[0].value || parseFloat(paidAmtInputs[0].value) === 0)) {
+        if (loanInt > 0) {
+            paidAmtInputs[0].value = loanInt.toFixed(2);
+        }
+    }
+    const allocatedTotal = paidAmtInputs.reduce((sum, el) => sum + (parseFloat(el.value) || 0), 0);
+
+    const sumInt = document.getElementById('lrSumIntPaid');
+    const sumFd = document.getElementById('lrSumFdGrowth');
+    const sumNewBal = document.getElementById('lrSumNewLoanBal');
+    const allocDisplay = document.getElementById('lrAllocatedTotalDisplay');
+    const diffAlert = document.getElementById('lrAllocationDiffAlert');
+
+    if (sumInt) sumInt.textContent = `Rs. ${loanInt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (sumFd) sumFd.textContent = `Rs. ${fdInt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (sumNewBal) sumNewBal.textContent = `Rs. ${newLoanBal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (allocDisplay) allocDisplay.textContent = `Rs. ${allocatedTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    if (diffAlert) {
+        const diff = loanInt - allocatedTotal;
+        if (loanInt > 0 && Math.abs(diff) > 0.01) {
+            diffAlert.classList.remove('hidden');
+            if (diff > 0) {
+                diffAlert.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1"></i> පොලී මුදලින් තවත් <strong>Rs. ${diff.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> ක් ගිණුම් වලින් වෙන් කළ යුතුය!`;
+            } else {
+                diffAlert.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1"></i> වෙන් කළ මුදල පොලී මුදලට වඩා <strong>Rs. ${Math.abs(diff).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> කින් වැඩිය!`;
+            }
+        } else {
+            diffAlert.classList.add('hidden');
+        }
+    }
+};
+
+window.saveAdvanceLoanSettlement = async (e, printAfter = false) => {
+    e.preventDefault();
+    try {
+        const loanAccId = parseInt(document.getElementById('lsLoanAcc').value);
+        const date = document.getElementById('lsDate').value;
+        const ref = document.getElementById('lsRef').value || await window.getNextReferenceNumber('LN-SET-');
+        const principal = parseFloat(document.getElementById('lsPrincipal').value) || 0;
+        const interest = parseFloat(document.getElementById('lsInterest').value) || 0;
+        const intAccId = parseInt(document.getElementById('lsIntAcc').value);
+        const desc = document.getElementById('lsDesc').value;
+
+        if (!loanAccId || isNaN(loanAccId)) {
+            window.utils.showToast("Please select a valid Loan Account", "error");
+            return;
+        }
+        if (principal <= 0) {
+            window.utils.showToast("Principal repayment amount must be greater than 0", "error");
+            return;
+        }
+
+        // Collect payment source rows
+        const paidAccEls = Array.from(document.getElementsByName('lsPaidAccount[]'));
+        const paidAmtEls = Array.from(document.getElementsByName('lsPaidAmount[]'));
+        
+        const validPaymentSources = [];
+        let totalAllocated = 0;
+
+        for (let idx = 0; idx < paidAccEls.length; idx++) {
+            const accId = parseInt(paidAccEls[idx].value);
+            const amt = parseFloat(paidAmtEls[idx].value) || 0;
+            if (!accId || isNaN(accId)) {
+                window.utils.showToast("Please select a payment source account for each line", "error");
+                return;
+            }
+            if (amt <= 0) {
+                window.utils.showToast("Payment amount for each account must be greater than 0", "error");
+                return;
+            }
+            validPaymentSources.push({ accountId: accId, amount: amt });
+            totalAllocated += amt;
+        }
+
+        if (validPaymentSources.length === 0) {
+            window.utils.showToast("Please add at least one payment source account", "error");
+            return;
+        }
+
+        const totalRequired = principal + interest;
+        if (Math.abs(totalAllocated - totalRequired) > 0.01) {
+            window.utils.showToast(`ගෙවිය යුතු මුළු මුදල (Rs. ${totalRequired.toFixed(2)}) සහ ගිණුම් වලින් ගෙවන මුදල් එකතුව (Rs. ${totalAllocated.toFixed(2)}) සමාන විය යුතුය!`, "error");
+            return;
+        }
+
+        const loanAcc = await db.accounts.get(loanAccId);
+        const loanName = loanAcc ? loanAcc.accountName : 'Advance Loan';
+
+        // 1. Create Transaction Header
+        const txId = await db.transactions.add({
+            date: date,
+            type: 'Payment',
+            reference: ref,
+            memberId: null,
+            otherName: loanName,
+            description: desc || `අත්තිකාරම් ණය පියවීම: ${loanName} (ණය මුදල: Rs. ${principal.toFixed(2)}, පොලිය: Rs. ${interest.toFixed(2)})`,
+            unit: window.currentUnit,
+            userId: window.auth.session ? window.auth.session.id : null,
+            status: 'Active'
+        });
+
+        // 2. Create Double Entry Items
+        const entries = [];
+        
+        // Debit Loan Liability Account (reduces loan liability)
+        entries.push({
+            transactionId: txId,
+            accountId: loanAccId,
+            debit: principal,
+            credit: 0
+        });
+
+        // Debit Interest Expense Account (if interest > 0)
+        if (interest > 0) {
+            entries.push({
+                transactionId: txId,
+                accountId: intAccId,
+                debit: interest,
+                credit: 0
+            });
+        }
+
+        // Credit Each Payment Source Account for its allocated amount
+        validPaymentSources.forEach(ps => {
+            entries.push({
+                transactionId: txId,
+                accountId: ps.accountId,
+                debit: 0,
+                credit: ps.amount
+            });
+        });
+
+        await db.entries.bulkAdd(entries);
+
+        window.utils.showToast("අත්තිකාරම් ණය පියවීම සාර්ථකව සටහන් විය!");
+        window.utils.closeModal();
+        if (window.loadTransactionsTable) window.loadTransactionsTable();
+        if (window.loadAccountsTable) window.loadAccountsTable();
+        if (window.refreshCurrentView) window.refreshCurrentView();
+
+        if (printAfter) {
+            setTimeout(() => {
+                window.printTransaction(txId);
+            }, 500);
+        }
+    } catch (err) {
+        console.error(err);
+        window.utils.showToast("Error saving loan settlement", "error");
+    }
+};
+
+window.saveAdvanceLoanRenewal = async (e, printAfter = false) => {
+    e.preventDefault();
+    try {
+        const loanAccId = parseInt(document.getElementById('lrLoanAcc').value);
+        const fdAccId = parseInt(document.getElementById('lrFdAcc').value) || null;
+        const date = document.getElementById('lrDate').value;
+        const ref = document.getElementById('lrRef').value || await window.getNextReferenceNumber('LN-RNW-');
+        
+        const loanInterest = parseFloat(document.getElementById('lrLoanIntAmount').value) || 0;
+        const loanIntAccId = parseInt(document.getElementById('lrLoanIntAcc').value);
+
+        // Collect renewal interest payment sources if loanInterest > 0
+        const validPaymentSources = [];
+        if (loanInterest > 0) {
+            const paidAccEls = Array.from(document.getElementsByName('lrPaidAccount[]'));
+            const paidAmtEls = Array.from(document.getElementsByName('lrPaidAmount[]'));
+            let totalAllocated = 0;
+
+            for (let idx = 0; idx < paidAccEls.length; idx++) {
+                const accId = parseInt(paidAccEls[idx].value);
+                const amt = parseFloat(paidAmtEls[idx].value) || 0;
+                if (!accId || isNaN(accId)) {
+                    window.utils.showToast("Please select a payment account for interest", "error");
+                    return;
+                }
+                if (amt <= 0) {
+                    window.utils.showToast("Interest payment amount for each account must be greater than 0", "error");
+                    return;
+                }
+                validPaymentSources.push({ accountId: accId, amount: amt });
+                totalAllocated += amt;
+            }
+
+            if (validPaymentSources.length === 0) {
+                window.utils.showToast("Please add at least one payment account for loan interest", "error");
+                return;
+            }
+
+            if (Math.abs(totalAllocated - loanInterest) > 0.01) {
+                window.utils.showToast(`ගෙවිය යුතු පොලී මුදල (Rs. ${loanInterest.toFixed(2)}) සහ ගිණුම් වලින් වෙන්කළ මුදල (Rs. ${totalAllocated.toFixed(2)}) සමාන විය යුතුය!`, "error");
+                return;
+            }
+        }
+
+        const isFdInt = document.getElementById('lrFdInterestToggle')?.checked || false;
+        const fdInterest = isFdInt ? (parseFloat(document.getElementById('lrFdIntAmount').value) || 0) : 0;
+        const fdIntAccId = parseInt(document.getElementById('lrFdIntAcc').value);
+
+        const adjMode = document.querySelector('input[name="lrAdjMode"]:checked')?.value || 'none';
+        const adjAmount = (adjMode !== 'none') ? (parseFloat(document.getElementById('lrAdjAmount').value) || 0) : 0;
+        const adjAccountId = (adjMode !== 'none') ? parseInt(document.getElementById('lrAdjAccount').value) : null;
+
+        const newLoanAccName = document.getElementById('lrNewLoanAccName')?.value.trim();
+        const newAccAction = document.querySelector('input[name="lrNewAccAction"]:checked')?.value || 'transfer';
+
+        const desc = document.getElementById('lrDesc').value;
+
+        if (!loanAccId || isNaN(loanAccId)) {
+            window.utils.showToast("Please select a valid Loan Account", "error");
+            return;
+        }
+
+        if (loanInterest <= 0 && fdInterest <= 0 && adjAmount <= 0 && !newLoanAccName) {
+            window.utils.showToast("Please enter at least interest payment, FD interest, or loan adjustments", "error");
+            return;
+        }
+
+        if (isFdInt && fdInterest > 0 && !fdAccId) {
+            window.utils.showToast("Please select a Fixed Deposit account to add the FD interest", "error");
+            return;
+        }
+
+        if (adjMode !== 'none' && adjAmount > 0 && (!adjAccountId || isNaN(adjAccountId))) {
+            window.utils.showToast("Please select an account for Principal adjustment", "error");
+            return;
+        }
+
+        const loanAcc = await db.accounts.get(loanAccId);
+        const oldLoanName = loanAcc ? loanAcc.accountName : 'Advance Loan';
+        let targetLoanName = oldLoanName;
+
+        // Check if renaming existing account
+        if (newLoanAccName && newLoanAccName !== oldLoanName && newAccAction === 'rename') {
+            await db.accounts.update(loanAccId, { accountName: newLoanAccName });
+            targetLoanName = newLoanAccName;
+        }
+
+        // 1. Create Transaction Header
+        const txId = await db.transactions.add({
+            date: date,
+            type: 'Transfer',
+            reference: ref,
+            memberId: null,
+            otherName: (newLoanAccName && newAccAction === 'transfer') ? `${oldLoanName} -> ${newLoanAccName}` : targetLoanName,
+            description: desc || `අත්තිකාරම් ණය අලුත් කිරීම: ${targetLoanName} (පොලිය: Rs. ${loanInterest.toFixed(2)}${fdInterest > 0 ? `, FD පොලිය: Rs. ${fdInterest.toFixed(2)}` : ''})`,
+            unit: window.currentUnit,
+            userId: window.auth.session ? window.auth.session.id : null,
+            status: 'Active'
+        });
+
+        // 2. Create Double Entry Items
+        const entries = [];
+
+        // 2.1 Loan Interest Paid Entries (Debit Interest Expense, Credit Selected Cash/Bank Accounts)
+        if (loanInterest > 0) {
+            entries.push({
+                transactionId: txId,
+                accountId: loanIntAccId,
+                debit: loanInterest,
+                credit: 0
+            });
+            validPaymentSources.forEach(ps => {
+                entries.push({
+                    transactionId: txId,
+                    accountId: ps.accountId,
+                    debit: 0,
+                    credit: ps.amount
+                });
+            });
+        }
+
+        // 2.2 FD Interest Income Capitalization Entries (Debit FD Asset, Credit FD Interest Income)
+        if (fdInterest > 0 && fdAccId) {
+            entries.push({
+                transactionId: txId,
+                accountId: fdAccId,
+                debit: fdInterest,
+                credit: 0
+            });
+            entries.push({
+                transactionId: txId,
+                accountId: fdIntAccId,
+                debit: 0,
+                credit: fdInterest
+            });
+        }
+
+        // 2.3 Principal Adjustment and New Loan Account Transfer Handling
+        if (newLoanAccName && newLoanAccName !== oldLoanName && newAccAction === 'transfer') {
+            // Find or create the new liability loan account
+            let targetNewAcc = await db.accounts.where('accountName').equalsIgnoreCase(newLoanAccName).first();
+            if (!targetNewAcc) {
+                const newId = await db.accounts.add({
+                    accountName: newLoanAccName,
+                    accountType: 'Liability',
+                    category: loanAcc.category || 'Advance Loan',
+                    unit: window.currentUnit
+                });
+                targetNewAcc = { id: newId, accountName: newLoanAccName };
+            }
+
+            const currentOutstanding = await window.getAccountBalance(loanAccId);
+            let finalNewPrincipal = currentOutstanding;
+            if (adjMode === 'topup') finalNewPrincipal += adjAmount;
+            else if (adjMode === 'repay') finalNewPrincipal -= adjAmount;
+
+            // Close old loan account
+            if (currentOutstanding > 0) {
+                entries.push({
+                    transactionId: txId,
+                    accountId: loanAccId,
+                    debit: currentOutstanding,
+                    credit: 0
+                });
+            }
+
+            // Open new loan account with final renewed balance
+            if (finalNewPrincipal > 0) {
+                entries.push({
+                    transactionId: txId,
+                    accountId: targetNewAcc.id,
+                    debit: 0,
+                    credit: finalNewPrincipal
+                });
+            }
+
+            // Cash / Bank inflows or outflows for top-up or repay
+            if (adjMode === 'topup' && adjAmount > 0 && adjAccountId) {
+                entries.push({
+                    transactionId: txId,
+                    accountId: adjAccountId,
+                    debit: adjAmount,
+                    credit: 0
+                });
+            } else if (adjMode === 'repay' && adjAmount > 0 && adjAccountId) {
+                entries.push({
+                    transactionId: txId,
+                    accountId: adjAccountId,
+                    debit: 0,
+                    credit: adjAmount
+                });
+            }
+        } else {
+            // Standard adjustment on the existing loan account
+            if (adjMode === 'topup' && adjAmount > 0 && adjAccountId) {
+                entries.push({
+                    transactionId: txId,
+                    accountId: adjAccountId,
+                    debit: adjAmount,
+                    credit: 0
+                });
+                entries.push({
+                    transactionId: txId,
+                    accountId: loanAccId,
+                    debit: 0,
+                    credit: adjAmount
+                });
+            } else if (adjMode === 'repay' && adjAmount > 0 && adjAccountId) {
+                entries.push({
+                    transactionId: txId,
+                    accountId: loanAccId,
+                    debit: adjAmount,
+                    credit: 0
+                });
+                entries.push({
+                    transactionId: txId,
+                    accountId: adjAccountId,
+                    debit: 0,
+                    credit: adjAmount
+                });
+            }
+        }
+
+        await db.entries.bulkAdd(entries);
+
+        window.utils.showToast("අත්තිකාරම් ණය අලුත් කිරීම සාර්ථකව සටහන් විය!");
+        window.utils.closeModal();
+        if (window.loadTransactionsTable) window.loadTransactionsTable();
+        if (window.loadAccountsTable) window.loadAccountsTable();
+        if (window.refreshCurrentView) window.refreshCurrentView();
+
+        if (printAfter) {
+            setTimeout(() => {
+                window.printTransaction(txId);
+            }, 500);
+        }
+    } catch (err) {
+        console.error(err);
+        window.utils.showToast("Error saving loan renewal", "error");
+    }
+};
+
