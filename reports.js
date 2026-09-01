@@ -1125,7 +1125,18 @@ async function generateMonthlyBook() {
         if (t.reference === 'OP-BAL') return true;
         return t.date < startDate;
     }).map(t => t.id));
-    const mbEntriesBefore = entries.filter(e => mbTxIdsBefore.has(e.transactionId));
+    let mbEntriesBefore = entries.filter(e => mbTxIdsBefore.has(e.transactionId));
+
+    // Also roll up SAP cash account entries before startDate into Main unit opening balance
+    if (isMainUnit) {
+        const extraSapBefore = entries.filter(e => {
+            const tx = allTxs.find(t => t.id === e.transactionId);
+            return tx && tx.status !== 'Cancelled' && tx.unit === 'SAP' && sapCashAccountIds.has(e.accountId)
+                && (tx.reference === 'OP-BAL' || tx.date < startDate);
+        });
+        mbEntriesBefore = [...mbEntriesBefore, ...extraSapBefore];
+    }
+
     let mbOpeningCash = 0;
     let mbClosingCash = 0;
     accounts.filter(a => a.accountType === 'Asset').forEach(acc => {
