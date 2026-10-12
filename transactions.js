@@ -765,115 +765,134 @@ window.printTransaction = async (id) => {
             if (isOriginal) {
                 // Original Copy: Received by (Name/Sig) and Treasurer
                 sigAreaHtml = `
-                    <div style="display: flex; justify-content: space-between; margin-top: 10mm; align-items: flex-end;">
-                        <div style="width: 55%; text-align: left;">
-                            <div style="margin-bottom: 5mm;">..................................................................</div>
-                            <div style="font-size: 10px; font-weight: 800;">මුදල් භාරගත් බවට නම සහ අත්සන (Received by Name & Signature)</div>
-                        </div>
-                        <div style="width: 40%; text-align: right;">
-                            <div style="margin-bottom: 5mm;">................................................</div>
-                            <div style="font-size: 10px; font-weight: 800;">භාණ්ඩාගාරික (Treasurer)</div>
+                    <div style="width: 100%; margin-top: auto; padding-top: 4mm;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                            <div style="width: 52%; text-align: left;">
+                                <div style="height: 12mm;"></div> <!-- Signature writing zone -->
+                                <div style="margin-bottom: 2mm; font-size: 11px; letter-spacing: 1px;">..................................................................</div>
+                                <div style="font-size: 10.5px; font-weight: 800;">මුදල් භාරගත් බවට නම සහ අත්සන (Received by Name & Signature)</div>
+                            </div>
+                            <div style="width: 42%; text-align: right;">
+                                <div style="height: 12mm;"></div> <!-- Signature writing zone -->
+                                <div style="margin-bottom: 2mm; font-size: 11px; letter-spacing: 1px;">................................................</div>
+                                <div style="font-size: 10.5px; font-weight: 800;">භාණ්ඩාගාරික (Treasurer)</div>
+                            </div>
                         </div>
                     </div>
                 `;
             } else {
-                // Office Copy: 4 Signatures in a 2x2 Table for better print compatibility
+                // Office Copy: 4 Signatures in a 2x2 Table cleanly inside the box
                 sigAreaHtml = `
-                    <table style="width: 100%; margin-top: 10mm; border: none; border-collapse: collapse;">
-                        <tr>
-                            <td style="width: 50%; padding-bottom: 8mm; vertical-align: bottom; text-align: left;">
-                                <div style="margin-bottom: 4mm;">................................................</div>
-                                <div style="font-size: 9px; font-weight: 800;">මුදල් භාරදුන් බවට භාණ්ඩාගාරික (Handed over by Treasurer)</div>
-                            </td>
-                            <td style="width: 50%; padding-bottom: 8mm; vertical-align: bottom; text-align: right;">
-                                <div style="margin-bottom: 4mm;">................................................</div>
-                                <div style="font-size: 9px; font-weight: 800;">මුදල් භාරගත් බවට නම සහ අත්සන (Received by Name & Signature)</div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td style="width: 50%; vertical-align: bottom; text-align: left;">
-                                <div style="margin-bottom: 4mm;">................................................</div>
-                                <div style="font-size: 9px; font-weight: 800;">පරීක්ෂා කළේ: විගණන නිලධාරී (Checked by Auditor)</div>
-                            </td>
-                            <td style="width: 50%; vertical-align: bottom; text-align: right;">
-                                <div style="margin-bottom: 4mm;">................................................</div>
-                                <div style="font-size: 9px; font-weight: 800;">අනුමත කළේ: සභාපති (Approved by Chairman)</div>
-                            </td>
-                        </tr>
-                    </table>
+                    <div style="width: 100%; margin-top: auto; padding-top: 3mm;">
+                        <table style="width: 100%; border: none; border-collapse: collapse;">
+                            <!-- Row 1 Signatures -->
+                            <tr>
+                                <td style="width: 50%; vertical-align: bottom; text-align: left;">
+                                    <div style="height: 8mm;"></div> <!-- Signing space for Treasurer -->
+                                    <div style="margin-bottom: 1.5mm; font-size: 10px; letter-spacing: 1px;">................................................</div>
+                                    <div style="font-size: 9px; font-weight: 800;">මුදල් භාරදුන් බවට භාණ්ඩාගාරික (Handed over by Treasurer)</div>
+                                </td>
+                                <td style="width: 50%; vertical-align: bottom; text-align: right;">
+                                    <div style="height: 8mm;"></div> <!-- Signing space for Recipient -->
+                                    <div style="margin-bottom: 1.5mm; font-size: 10px; letter-spacing: 1px;">................................................</div>
+                                    <div style="font-size: 9px; font-weight: 800;">මුදල් භාරගත් බවට නම සහ අත්සන (Received by Name & Signature)</div>
+                                </td>
+                            </tr>
+                            <!-- Spacer between Row 1 and Row 2 -->
+                            <tr style="height: 6mm;">
+                                <td colspan="2"></td>
+                            </tr>
+                            <!-- Row 2 Signatures -->
+                            <tr>
+                                <td style="width: 50%; vertical-align: bottom; text-align: left;">
+                                    <div style="margin-bottom: 1.5mm; font-size: 10px; letter-spacing: 1px;">................................................</div>
+                                    <div style="font-size: 9px; font-weight: 800;">පරීක්ෂා කළේ: විගණන නිලධාරී (Checked by Auditor)</div>
+                                </td>
+                                <td style="width: 50%; vertical-align: bottom; text-align: right;">
+                                    <div style="margin-bottom: 1.5mm; font-size: 10px; letter-spacing: 1px;">................................................</div>
+                                    <div style="font-size: 9px; font-weight: 800;">අනුමත කළේ: සභාපති (Approved by Chairman)</div>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
                 `;
             }
 
             return `
-            <div style="width: 210mm; height: 148.5mm; padding: 8mm; ${!isOriginal ? 'padding-left: 20mm;' : ''} font-family: 'Inter', 'Iskoola Pota', sans-serif; color: black; background: white; border-bottom: 2px dashed #000; box-sizing: border-box; position: relative; overflow: hidden; border: 1.5px solid #000;">
-                <!-- Label Badge -->
-                <div style="position: absolute; right: 8mm; top: 8mm; font-size: 8px; font-weight: 900; color: #333; text-transform: uppercase; border: 1px solid #000; padding: 1mm 2mm; background: #eee;">${label}</div>
-                
-                <!-- Header -->
-                <div style="display: flex; gap: 10mm; margin-bottom: 3mm;">
-                    <div style="flex: 1;">
-                        <h1 style="font-size: 16px; font-weight: 900; margin: 0; color: #000;">${(tx.unit || 'Main') === 'SAP' ? 'SAP CENTER - ARUNALU' : 'Arunalu Welfare Society'}</h1>
-                        <p style="font-size: 10px; font-weight: bold; margin: 1px 0;">Galapitiyagama, Nikaweratiya</p>
-                        <p style="font-size: 10px; font-weight: 900; color: #000; text-transform: uppercase;">${(tx.unit || 'Main') === 'SAP' ? 'SAP CENTER PROJECT - WELFARE BRANCH' : 'Galapitiyagama Sanasa Society - Welfare Branch'}</p>
-                    </div>
-                </div>
-
-                <!-- Title & Metadata Boxes -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 3mm;">
-                    <div style="font-size: 14px; font-weight: 900; text-decoration: underline; text-transform: uppercase;">මුදල් ගෙවීමේ වවුචරය (PAYMENT VOUCHER)</div>
-                    <div style="display: flex; gap: 3mm; align-items: flex-end;">
-                        <div style="display: flex; flex-direction: column; gap: 1mm;">
-                            <div style="display: flex; align-items: center; border: 1px solid #000; padding: 0.5mm 2mm;">
-                                <span style="font-size: 9px; font-weight: 800; margin-right: 2mm;">වවුචර අංකය:</span>
-                                <span style="font-size: 11px; font-weight: 900;">${tx.reference || '-'}</span>
+            <div style="position: relative; width: 100%;">
+                <!-- Voucher Box (Bordered, clean, fully containing all details inside) -->
+                <div style="width: 100%; height: 137mm; max-height: 137mm; padding: 4mm 6mm; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Inter', 'Iskoola Pota', sans-serif; color: black; background: white; box-sizing: border-box; border: 1.5px solid #000;">
+                    <div>
+                        <!-- Label Badge -->
+                        <div style="position: absolute; right: 6mm; top: 4mm; font-size: 8px; font-weight: 900; color: #333; text-transform: uppercase; border: 1px solid #000; padding: 0.5mm 2.5mm; background: #eee;">${label}</div>
+                        
+                        <!-- Header -->
+                        <div style="display: flex; gap: 8mm; margin-bottom: 2mm;">
+                            <div style="flex: 1;">
+                                <h1 style="font-size: 16px; font-weight: 900; margin: 0; line-height: 1.15; color: #000;">${(tx.unit || 'Main') === 'SAP' ? 'SAP CENTER - ARUNALU' : 'Arunalu Welfare Society'}</h1>
+                                <p style="font-size: 10px; font-weight: bold; margin: 0.5mm 0;">Galapitiyagama, Nikaweratiya</p>
+                                <p style="font-size: 10px; font-weight: 900; color: #000; margin: 0; text-transform: uppercase;">${(tx.unit || 'Main') === 'SAP' ? 'SAP CENTER PROJECT - WELFARE BRANCH' : 'Galapitiyagama Sanasa Society - Welfare Branch'}</p>
                             </div>
                         </div>
-                        <div style="display: flex; align-items: center; border: 1px solid #000; padding: 0.5mm 2mm; height: fit-content;">
-                            <span style="font-size: 9px; font-weight: 800; margin-right: 2mm;">දිනය:</span>
-                            <span style="font-size: 11px; font-weight: 900;">${window.utils.formatDate(tx.date)}</span>
+
+                        <!-- Title & Metadata Boxes -->
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2.5mm;">
+                            <div style="font-size: 13.5px; font-weight: 900; text-decoration: underline; text-transform: uppercase; white-space: nowrap;">මුදල් ගෙවීමේ වවුචරය (PAYMENT VOUCHER)</div>
+                            <div style="display: flex; gap: 2mm; align-items: flex-end;">
+                                <div style="display: flex; flex-direction: column; gap: 0.5mm;">
+                                    <div style="display: flex; align-items: center; border: 1px solid #000; padding: 0.5mm 2mm;">
+                                        <span style="font-size: 8.5px; font-weight: 800; margin-right: 1.5mm;">වවුචර අංකය:</span>
+                                        <span style="font-size: 10.5px; font-weight: 900;">${tx.reference || '-'}</span>
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center; border: 1px solid #000; padding: 0.5mm 2mm; height: fit-content;">
+                                    <span style="font-size: 8.5px; font-weight: 800; margin-right: 1.5mm;">දිනය:</span>
+                                    <span style="font-size: 10.5px; font-weight: 900;">${window.utils.formatDate(tx.date)}</span>
+                                </div>
+                                <!-- QR Code via API -->
+                                <div style="margin-left: 1mm;">
+                                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`AWS | ${tx.reference} | ${memberLabel.split(' - ')[1] || memberLabel} | Rs.${total.toFixed(2)} | ${window.utils.formatDate(tx.date)} | ${entries.filter(e => e.debit > 0).map(e => accMap[e.accountId]?.accountName || '').join(', ')}`)}" style="width: 14mm; height: 14mm; border: 1px solid #eee;" />
+                                </div>
+                            </div>
                         </div>
-                        <!-- QR Code via API (More reliable for print) -->
-                        <div style="margin-left: 1mm;">
-                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`AWS | ${tx.reference} | ${memberLabel.split(' - ')[1] || memberLabel} | Rs.${total.toFixed(2)} | ${window.utils.formatDate(tx.date)} | ${entries.filter(e => e.debit > 0).map(e => accMap[e.accountId]?.accountName || '').join(', ')}`)}" style="width: 18mm; height: 18mm; border: 1px solid #eee;" />
+
+                        <!-- Payee Info -->
+                        <div style="margin-bottom: 2.5mm; border-bottom: 1px dotted #000; padding-bottom: 0.5mm;">
+                            <span style="font-size: 10px; font-weight: 800;">සාමාජික අංකය සහ නම (Member No & Name):</span>
+                            <span style="font-size: 12.5px; font-weight: 900; margin-left: 2mm;">${memberLabel}</span>
                         </div>
+
+                        <!-- Main Table -->
+                        <table style="width: 100%; border: 1.5px solid #000; border-collapse: collapse; margin-bottom: 2mm;">
+                            <thead>
+                                <tr style="border-bottom: 1.5px solid #000; background: #f9f9f9;">
+                                    <th style="text-align: center; padding: 1.2mm 2mm; font-size: 10px; font-weight: 900; border-right: 1.5px solid #000;">ගෙවීම් පිළිබඳ විස්තරය (Description of Payment)</th>
+                                    <th style="text-align: center; padding: 1.2mm 2mm; font-size: 10px; font-weight: 900; width: 38mm;">මුදල (Amount Rs.)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style="min-height: 12mm; vertical-align: top;">
+                                    <td style="padding: 1.5mm 2mm; font-size: 11px; border-right: 1.5px solid #000; line-height: 1.35;">
+                                        ${entries.filter(e => e.debit > 0).map(e => `<div style="font-weight: bold;">• ${accMap[e.accountId]?.accountName || 'Unknown'}</div>`).join('')}
+                                        ${tx.description ? `<div style="margin-top: 1.5mm; font-style: italic; font-size: 9.5px; line-height: 1.3; color: #111; word-break: break-word;"><strong>Note:</strong> ${tx.description}</div>` : ''}
+                                    </td>
+                                    <td style="padding: 1.5mm 2mm; font-size: 12.5px; font-weight: 900; text-align: right;">
+                                        ${entries.filter(e => e.debit > 0).map(e => `<div>${e.debit.toFixed(2)}</div>`).join('')}
+                                    </td>
+                                </tr>
+                                <tr style="border-top: 1.5px solid #000; font-weight: 900; background: #eee;">
+                                    <td style="text-align: right; padding: 1.5mm 2mm; font-size: 10.5px; border-right: 1.5px solid #000; text-transform: uppercase;">මුළු එකතුව (GRAND TOTAL)</td>
+                                    <td style="text-align: right; padding: 1.5mm 2mm; font-size: 13px; font-weight: 900;">${total.toFixed(2)}</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
+
+                    ${sigAreaHtml}
                 </div>
 
-                <!-- Payee Info -->
-                <div style="margin-bottom: 3mm; border-bottom: 1px dotted #000; padding-bottom: 0.5mm;">
-                    <span style="font-size: 10px; font-weight: 800;">සාමාජික අංකය සහ නම (Member No & Name):</span>
-                    <span style="font-size: 12px; font-weight: 900; margin-left: 2mm;">${memberLabel}</span>
-                </div>
-
-                <!-- Main Table -->
-                <table style="width: 100%; border: 1.5px solid #000; border-collapse: collapse; margin-bottom: 4mm;">
-                    <thead>
-                        <tr style="border-bottom: 1.5px solid #000; background: #f9f9f9;">
-                            <th style="text-align: center; padding: 1.5mm; font-size: 10px; font-weight: 900; border-right: 1.5px solid #000;">ගෙවීම් පිළිබඳ විස්තරය (Description of Payment)</th>
-                            <th style="text-align: center; padding: 1.5mm; font-size: 10px; font-weight: 900; width: 40mm;">මුදල (Amount Rs.)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr style="height: 20mm; vertical-align: top;">
-                            <td style="padding: 2mm; font-size: 11px; border-right: 1.5px solid #000; line-height: 1.4;">
-                                ${entries.filter(e => e.debit > 0).map(e => `• ${accMap[e.accountId]?.accountName || 'Unknown'}`).join('<br>')}
-                                ${tx.description ? `<br><div style="margin-top: 1.5mm; font-style: italic; font-size: 10px;">Note: ${tx.description}</div>` : ''}
-                            </td>
-                            <td style="padding: 2mm; font-size: 12px; font-weight: 900; text-align: right;">
-                                ${entries.filter(e => e.debit > 0).map(e => `<div>${e.debit.toFixed(2)}</div>`).join('')}
-                            </td>
-                        </tr>
-                        <tr style="border-top: 1.5px solid #000; font-weight: 900; background: #eee;">
-                            <td style="text-align: right; padding: 2mm; font-size: 11px; border-right: 1.5px solid #000; text-transform: uppercase;">මුළු එකතුව (GRAND TOTAL)</td>
-                            <td style="text-align: right; padding: 2mm; font-size: 13px;">${total.toFixed(2)}</td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                ${sigAreaHtml}
-
-                <!-- Vertical Developer Branding -->
-                <div style="position: absolute; right: 1mm; bottom: 60mm; transform: rotate(-90deg); transform-origin: right bottom; font-size: 7px; color: #999; white-space: nowrap; font-weight: bold; font-style: italic; letter-spacing: 0.5px; text-transform: uppercase; pointer-events: none;">
+                <!-- Vertical Developer Branding OUTSIDE the box on the right margin (Never crossed or touching box) -->
+                <div style="position: absolute; left: calc(100% + 1.5mm); top: 35mm; writing-mode: vertical-rl; transform: rotate(180deg); font-size: 7.5px; color: #444; white-space: nowrap; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase; pointer-events: none;">
                     System - iraasoft solution 0752895951
                 </div>
             </div>
@@ -884,12 +903,16 @@ window.printTransaction = async (id) => {
             <style>
                 @media print {
                     @page { size: A4 portrait; margin: 0; }
-                    html, body { width: 210mm !important; height: auto !important; overflow: visible !important; margin: 0 !important; padding: 0 !important; }
-                    #printArea { width: 210mm !important; position: static !important; height: auto !important; overflow: visible !important; }
+                    html, body { width: 210mm !important; height: 297mm !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; background: white !important; }
+                    #printArea { width: 210mm !important; position: static !important; height: 297mm !important; max-height: 297mm !important; overflow: hidden !important; margin: 0 auto !important; padding: 0 !important; }
                 }
             </style>
-            <div style="width: 210mm; background: white;">
+            <div style="width: 210mm; height: 297mm; max-height: 297mm; background: white; margin: 0 auto; padding: 7mm 7mm 7mm 14mm; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
                 ${voucherHtml('Original Copy - Member')}
+                <div style="width: 100%; height: 4mm; display: flex; align-items: center; justify-content: center; position: relative;">
+                    <div style="width: 100%; border-bottom: 1.5px dashed #444;"></div>
+                    <span style="position: absolute; background: white; padding: 0 8px; font-size: 8px; color: #444; font-weight: bold; letter-spacing: 0.5px;">✂ මෙතැනින් කපන්න (Cut Along The Line)</span>
+                </div>
                 ${voucherHtml('Office Copy - Society')}
             </div>
         `;
@@ -969,7 +992,7 @@ window.printTransaction = async (id) => {
                 <div style="text-align: center; margin-top: 16px; font-size: 10px; font-weight: bold; border-top: 1px dashed #ccc; padding-top: 6px;">
                     THANK YOU! - IRRASOFT SOLUTION
                 </div>
-                <div style="height: 150mm; display: flex; align-items: flex-end; justify-content: center; font-size: 4px; color: #eee; clear: both; box-sizing: border-box; padding-bottom: 2mm;">.</div>
+                <div style="height: 15mm; display: flex; align-items: flex-end; justify-content: center; font-size: 4px; color: #eee; clear: both; box-sizing: border-box; padding-bottom: 2mm;">.</div>
             </div>
         `;
     }
