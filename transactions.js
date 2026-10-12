@@ -156,7 +156,10 @@ async function loadTransactionsTable() {
                         ${tx.status !== 'Cancelled' ? `
                         <button onclick="window.cancelTransaction(${tx.id})" class="text-red-500 hover:text-red-700 w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 flex items-center justify-center transition-colors tooltip" title="Cancel">
                             <i class="fa-solid fa-ban"></i>
-                        </button>` : ''}
+                        </button>` : `
+                        <button onclick="window.uncancelTransaction(${tx.id})" class="text-emerald-600 hover:text-emerald-800 w-8 h-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center transition-colors tooltip" title="Restore / නැවත සක්‍රිය කරන්න">
+                            <i class="fa-solid fa-rotate-left"></i>
+                        </button>`}
                     </div>
                 </td>
             </tr>
@@ -1031,7 +1034,12 @@ window.viewTransaction = async (id) => {
             </table>
         </div>
 
-        <div class="flex justify-end pr-1">
+        <div class="flex justify-end gap-3 pr-1">
+            ${tx.status === 'Cancelled' ? `
+            <button onclick="window.utils.closeModal(); window.uncancelTransaction(${tx.id});" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-emerald-500/30 flex items-center gap-2">
+                <i class="fa-solid fa-rotate-left"></i> Restore Transaction
+            </button>
+            ` : ''}
             <button onclick="window.utils.closeModal()" class="bg-gray-800 hover:bg-black text-white px-6 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-gray-500/30">
                 Close Viewer
             </button>
@@ -1074,13 +1082,20 @@ window.submitCancellation = async (e, id) => {
     }
 
     try {
+        const entries = await db.entries.where('transactionId').equals(id).toArray();
+        const savedEntries = entries.map(entry => ({
+            accountId: entry.accountId,
+            debit: parseFloat(entry.debit) || 0,
+            credit: parseFloat(entry.credit) || 0
+        }));
+
         await db.transactions.update(id, {
             status: 'Cancelled',
-            cancelReason: reason
+            cancelReason: reason,
+            savedEntries: savedEntries
         });
 
         // Find entries and zero them out to keep the audit trail fully intact
-        const entries = await db.entries.where('transactionId').equals(id).toArray();
         for (let entry of entries) {
             await db.entries.update(entry.id, { debit: 0, credit: 0 });
         }
@@ -1093,6 +1108,60 @@ window.submitCancellation = async (e, id) => {
         console.error(err);
         window.utils.showToast("Error cancelling transaction.", "error");
     }
+};
+
+window.uncancelTransaction = async (id) => {
+    const tx = await db.transactions.get(id);
+    if (!tx || tx.status !== 'Cancelled') return;
+
+    window.utils.showConfirm(
+        "ගනුදෙනුව නැවත සක්‍රිය කරන්න (Restore)?",
+        `මෙම අවලංගු කළ ගනුදෙනුව (${tx.reference || 'N/A'}) නැවත සක්‍රිය (Active) කර පෙර මුදල් ප්‍රමාණයන් යථා තත්ත්වයට පත් කිරීමට අවශ්‍ය බව සහතිකද?`,
+        async () => {
+            try {
+                if (tx.savedEntries && tx.savedEntries.length > 0) {
+                    await db.entries.where('transactionId').equals(id).delete();
+                    const newEntries = tx.savedEntries.map(e => ({
+                        transactionId: id,
+                        accountId: e.accountId,
+                        debit: e.debit,
+                        credit: e.credit
+                    }));
+                    await db.entries.bulkAdd(newEntries);
+                } else {
+                    // Fallback: Check if there is an active twin with the same reference (e.g., AR000514)
+                    const twin = await db.transactions
+                        .filter(t => t.id !== id && t.reference === tx.reference && t.status !== 'Cancelled')
+                        .first();
+                    if (twin) {
+                        const twinEntries = await db.entries.where('transactionId').equals(twin.id).toArray();
+                        await db.entries.where('transactionId').equals(id).delete();
+                        const newEntries = twinEntries.map(e => ({
+                            transactionId: id,
+                            accountId: e.accountId,
+                            debit: e.debit,
+                            credit: e.credit
+                        }));
+                        await db.entries.bulkAdd(newEntries);
+                    }
+                }
+
+                await db.transactions.update(id, {
+                    status: 'Active',
+                    cancelReason: null
+                });
+
+                window.utils.showToast("ගනුදෙනුව සාර්ථකව නැවත සක්‍රිය කරන ලදී (Restored).", "success");
+                loadTransactionsTable();
+                if (window.refreshCurrentView) window.refreshCurrentView();
+            } catch (err) {
+                console.error(err);
+                window.utils.showToast("Error restoring transaction.", "error");
+            }
+        },
+        "නැවත සක්‍රිය කරන්න (Restore)",
+        "warning"
+    );
 };
 window.selectMemberInTx = async (memberId) => {
     const member = await db.members.get(memberId);

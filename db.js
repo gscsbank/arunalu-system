@@ -176,6 +176,46 @@ db.on('ready', async () => {
         await db.transactions.delete(tx.id);
         setTimeout(() => alert('AR000034 ගනුදෙනුව සාර්ථකව මකා දැමුණි. කරුණාකර පිටුව නැවත Refresh කරන්න.'), 500);
     }
+
+    // Auto-restore cancelled AR000514 duplicate receipt as requested
+    const cancelledAR514 = await db.transactions
+        .where('reference')
+        .equals('AR000514')
+        .filter(t => t.status === 'Cancelled')
+        .first();
+
+    if (cancelledAR514) {
+        const activeAR514 = await db.transactions
+            .where('reference')
+            .equals('AR000514')
+            .filter(t => t.status !== 'Cancelled')
+            .first();
+
+        if (activeAR514) {
+            const activeEntries = await db.entries.where('transactionId').equals(activeAR514.id).toArray();
+            await db.entries.where('transactionId').equals(cancelledAR514.id).delete();
+            const newEntries = activeEntries.map(e => ({
+                transactionId: cancelledAR514.id,
+                accountId: e.accountId,
+                debit: e.debit,
+                credit: e.credit
+            }));
+            await db.entries.bulkAdd(newEntries);
+            await db.transactions.update(cancelledAR514.id, {
+                status: 'Active',
+                cancelReason: null,
+                description: activeAR514.description || ''
+            });
+            console.log("AR000514 restored successfully to Active state.");
+            setTimeout(() => {
+                if (window.utils && window.utils.showToast) {
+                    window.utils.showToast('AR000514 ලදුපත සාර්ථකව නැවත සක්‍රිය කරන ලදී (Restored).', 'success');
+                }
+                if (window.loadTransactionsTable) window.loadTransactionsTable();
+                if (window.refreshCurrentView) window.refreshCurrentView();
+            }, 600);
+        }
+    }
 });
 
 db.open().catch(err => {
