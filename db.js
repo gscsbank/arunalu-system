@@ -216,6 +216,55 @@ db.on('ready', async () => {
             }, 600);
         }
     }
+
+    // Auto-restore any cancelled AR000483 receipt so both remain Active without cancellation as requested
+    const cancelledAR483List = await db.transactions
+        .where('reference')
+        .equals('AR000483')
+        .filter(t => t.status === 'Cancelled')
+        .toArray();
+
+    for (const cancelledAR483 of cancelledAR483List) {
+        if (cancelledAR483.savedEntries && cancelledAR483.savedEntries.length > 0) {
+            await db.entries.where('transactionId').equals(cancelledAR483.id).delete();
+            const restoredEntries = cancelledAR483.savedEntries.map(e => ({
+                transactionId: cancelledAR483.id,
+                accountId: e.accountId,
+                debit: parseFloat(e.debit) || 0,
+                credit: parseFloat(e.credit) || 0
+            }));
+            await db.entries.bulkAdd(restoredEntries);
+        } else {
+            const activeAR483 = await db.transactions
+                .where('reference')
+                .equals('AR000483')
+                .filter(t => t.status !== 'Cancelled')
+                .first();
+            if (activeAR483) {
+                const activeEntries = await db.entries.where('transactionId').equals(activeAR483.id).toArray();
+                await db.entries.where('transactionId').equals(cancelledAR483.id).delete();
+                const newEntries = activeEntries.map(e => ({
+                    transactionId: cancelledAR483.id,
+                    accountId: e.accountId,
+                    debit: parseFloat(e.debit) || 0,
+                    credit: parseFloat(e.credit) || 0
+                }));
+                await db.entries.bulkAdd(newEntries);
+            }
+        }
+        await db.transactions.update(cancelledAR483.id, {
+            status: 'Active',
+            cancelReason: null
+        });
+        console.log("AR000483 restored successfully to Active state.");
+        setTimeout(() => {
+            if (window.utils && window.utils.showToast) {
+                window.utils.showToast('AR000483 ලදුපත නැවත සක්‍රිය (Active) කරන ලදී. කිසිදු ලදුපතක් අවලංගු නොවේ.', 'info');
+            }
+            if (window.loadTransactionsTable) window.loadTransactionsTable();
+            if (window.refreshCurrentView) window.refreshCurrentView();
+        }, 800);
+    }
 });
 
 db.open().catch(err => {

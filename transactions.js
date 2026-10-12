@@ -343,10 +343,10 @@ window.openTransactionModal = async (type) => {
             
             <div class="pt-4 border-t border-gray-100 flex flex-wrap justify-end gap-2 sticky bottom-0 bg-white/95 backdrop-blur-md pb-2 mt-4">
                 <button type="button" onclick="window.utils.closeModal()" class="flex-1 md:flex-none px-4 py-2.5 rounded-lg text-gray-600 font-medium hover:bg-gray-100 transition-colors text-sm">Cancel</button>
-                <button type="button" onclick="window.saveTransaction(event, '${type}', true)" class="flex-1 md:flex-none bg-gray-800 hover:bg-black text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-gray-500/30 text-sm">
+                <button type="button" id="txBtnPrint" onclick="window.saveTransaction(event, '${type}', true)" class="flex-1 md:flex-none bg-gray-800 hover:bg-black text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-gray-500/30 text-sm">
                     <i class="fa-solid fa-print"></i> Save & Print
                 </button>
-                <button type="submit" class="w-full md:w-auto bg-${btnColor}-600 hover:bg-${btnColor}-700 text-white px-6 py-2.5 rounded-lg font-bold transition-colors shadow-lg shadow-${btnColor}-500/30 text-sm">
+                <button type="submit" id="txBtnSave" class="w-full md:w-auto bg-${btnColor}-600 hover:bg-${btnColor}-700 text-white px-6 py-2.5 rounded-lg font-bold transition-colors shadow-lg shadow-${btnColor}-500/30 text-sm">
                     <i class="fa-solid fa-save mr-2"></i> Save Only
                 </button>
             </div>
@@ -393,12 +393,43 @@ window.openTransactionModal = async (type) => {
 window.saveTransaction = async (e, type, printAfter = false) => {
     e.preventDefault();
 
+    if (window._isSavingTransaction) return;
+
+    const btnPrint = document.getElementById('txBtnPrint');
+    const btnSave = document.getElementById('txBtnSave');
+    const origPrintHtml = btnPrint ? btnPrint.innerHTML : '';
+    const origSaveHtml = btnSave ? btnSave.innerHTML : '';
+
+    if (btnPrint) { btnPrint.disabled = true; btnPrint.classList.add('opacity-50', 'pointer-events-none'); }
+    if (btnSave) { btnSave.disabled = true; btnSave.classList.add('opacity-50', 'pointer-events-none'); }
+
+    if (printAfter && btnPrint) {
+        btnPrint.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> සුරකිමින්...';
+    } else if (btnSave) {
+        btnSave.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> සුරකිමින්...';
+    }
+
+    window._isSavingTransaction = true;
+
     try {
         const date = document.getElementById('txDate').value;
-        const ref = document.getElementById('txRef').value;
+        const ref = (document.getElementById('txRef')?.value || '').trim();
         const payerInput = document.getElementById('txPayerInput').value.trim();
         const cbAccId = parseInt(document.getElementById('cbAccount').value);
         const desc = document.getElementById('txDesc').value;
+
+        // Prevent Duplicate Reference Number submission
+        if (ref) {
+            const existingTx = await db.transactions
+                .where('reference')
+                .equals(ref)
+                .filter(t => t.status !== 'Cancelled')
+                .first();
+            if (existingTx) {
+                window.utils.showToast(`මෙම ලදුපත්/වවුචර් අංකය (${ref}) දැනටමත් පද්ධතියට ඇතුලත් කර ඇත!`, 'error');
+                return;
+            }
+        }
 
         let memberId = null;
         let otherName = null;
@@ -486,6 +517,18 @@ window.saveTransaction = async (e, type, printAfter = false) => {
     } catch (err) {
         console.error(err);
         window.utils.showToast('Error saving transaction', 'error');
+    } finally {
+        window._isSavingTransaction = false;
+        if (btnPrint) {
+            btnPrint.disabled = false;
+            btnPrint.classList.remove('opacity-50', 'pointer-events-none');
+            btnPrint.innerHTML = origPrintHtml;
+        }
+        if (btnSave) {
+            btnSave.disabled = false;
+            btnSave.classList.remove('opacity-50', 'pointer-events-none');
+            btnSave.innerHTML = origSaveHtml;
+        }
     }
 };
 
@@ -562,6 +605,18 @@ window.openTransferModal = async () => {
 
 window.saveTransfer = async (e) => {
     e.preventDefault();
+
+    if (window._isSavingTransfer) return;
+    window._isSavingTransfer = true;
+
+    const submitBtn = document.querySelector('#txTransferForm button[type="submit"]');
+    const origHtml = submitBtn ? submitBtn.innerHTML : '';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-50', 'pointer-events-none');
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> මාරු කරමින්...';
+    }
+
     try {
         const fromAccId = parseInt(document.getElementById('tFrom').value);
         const toAccId = parseInt(document.getElementById('tTo').value);
@@ -573,8 +628,20 @@ window.saveTransfer = async (e) => {
         }
 
         const date = document.getElementById('tDate').value;
-        const ref = document.getElementById('tRef').value;
+        const ref = (document.getElementById('tRef')?.value || '').trim();
         const desc = document.getElementById('tDesc').value;
+
+        if (ref) {
+            const existingTx = await db.transactions
+                .where('reference')
+                .equals(ref)
+                .filter(t => t.status !== 'Cancelled')
+                .first();
+            if (existingTx) {
+                window.utils.showToast(`මෙම අංකය (${ref}) දැනටමත් පද්ධතියේ පවතී!`, 'error');
+                return;
+            }
+        }
 
         const txId = await db.transactions.add({
             date: date,
@@ -600,6 +667,13 @@ window.saveTransfer = async (e) => {
     } catch (err) {
         console.error(err);
         window.utils.showToast("Error processing transfer", "error");
+    } finally {
+        window._isSavingTransfer = false;
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-50', 'pointer-events-none');
+            submitBtn.innerHTML = origHtml;
+        }
     }
 };
 
@@ -1351,10 +1425,18 @@ window.getMemberDues = async (memberId, asOfDate = null) => {
     let entrancePaid = 0;
     if (entranceAcc) {
         const entranceEntries = await db.entries.where('accountId').equals(entranceAcc.id).toArray();
+        const countedTxIds = new Set();
+        const countedRefs = new Set();
         for (let e of entranceEntries) {
             const tx = await db.transactions.get(e.transactionId);
             // Rule: Only count payments made after or on the current joinDate
-            if (tx && tx.memberId === memberId && tx.status !== 'Cancelled' && tx.date >= joinDateStr) {
+            if (tx && (tx.memberId === memberId || String(tx.memberId) === String(memberId)) && tx.status !== 'Cancelled' && tx.date >= joinDateStr) {
+                const normRef = (tx.reference || '').replace(/\s+/g, '').toUpperCase();
+                if (normRef && countedRefs.has(normRef) && !countedTxIds.has(tx.id)) {
+                    continue; // Skip duplicate submission of the same receipt reference
+                }
+                countedTxIds.add(tx.id);
+                if (normRef) countedRefs.add(normRef);
                 entrancePaid += (parseFloat(e.credit) || 0);
             }
         }
@@ -1387,10 +1469,18 @@ window.getMemberDues = async (memberId, asOfDate = null) => {
         let monthlyPaid = 0;
         if (monthlyAccIds.length > 0) {
             const mEntries = await db.entries.where('accountId').anyOf(monthlyAccIds).toArray();
+            const countedTxIds = new Set();
+            const countedRefs = new Set();
             for (let e of mEntries) {
                 const tx = await db.transactions.get(e.transactionId);
                 // Rule: Only count payments made after or on the current joinDate
-                if (tx && tx.memberId === memberId && tx.status !== 'Cancelled' && tx.date >= joinDateStr) {
+                if (tx && (tx.memberId === memberId || String(tx.memberId) === String(memberId)) && tx.status !== 'Cancelled' && tx.date >= joinDateStr) {
+                    const normRef = (tx.reference || '').replace(/\s+/g, '').toUpperCase();
+                    if (normRef && countedRefs.has(normRef) && !countedTxIds.has(tx.id)) {
+                        continue; // Skip duplicate submission of the same receipt reference
+                    }
+                    countedTxIds.add(tx.id);
+                    if (normRef) countedRefs.add(normRef);
                     monthlyPaid += (parseFloat(e.credit) || 0);
                 }
             }
@@ -1448,10 +1538,18 @@ window.getMemberDues = async (memberId, asOfDate = null) => {
 
         let funeralPaid = 0;
         const fEntries = await db.entries.where('accountId').equals(funeralAcc.id).toArray();
+        const countedTxIds = new Set();
+        const countedRefs = new Set();
         for (let e of fEntries) {
             const tx = await db.transactions.get(e.transactionId);
             // Rule: Only count payments made after or on the current joinDate
-            if (tx && tx.memberId === memberId && tx.status !== 'Cancelled' && tx.date >= joinDateStr) {
+            if (tx && (tx.memberId === memberId || String(tx.memberId) === String(memberId)) && tx.status !== 'Cancelled' && tx.date >= joinDateStr) {
+                const normRef = (tx.reference || '').replace(/\s+/g, '').toUpperCase();
+                if (normRef && countedRefs.has(normRef) && !countedTxIds.has(tx.id)) {
+                    continue; // Skip duplicate submission of the same receipt reference
+                }
+                countedTxIds.add(tx.id);
+                if (normRef) countedRefs.add(normRef);
                 funeralPaid += (parseFloat(e.credit) || 0);
             }
         }
@@ -1463,9 +1561,17 @@ window.getMemberDues = async (memberId, asOfDate = null) => {
     let arrearsPaid = 0;
     if (arrearsAcc) {
         const aEntries = await db.entries.where('accountId').equals(arrearsAcc.id).toArray();
+        const countedTxIds = new Set();
+        const countedRefs = new Set();
         for (let e of aEntries) {
             const tx = await db.transactions.get(e.transactionId);
-            if (tx && tx.memberId === memberId && tx.status !== 'Cancelled' && tx.date >= joinDateStr) {
+            if (tx && (tx.memberId === memberId || String(tx.memberId) === String(memberId)) && tx.status !== 'Cancelled' && tx.date >= joinDateStr) {
+                const normRef = (tx.reference || '').replace(/\s+/g, '').toUpperCase();
+                if (normRef && countedRefs.has(normRef) && !countedTxIds.has(tx.id)) {
+                    continue; // Skip duplicate submission of the same receipt reference
+                }
+                countedTxIds.add(tx.id);
+                if (normRef) countedRefs.add(normRef);
                 arrearsPaid += (parseFloat(e.credit) || 0);
             }
         }
@@ -2775,6 +2881,8 @@ window.updateLoanRenewSummary = async (autoAdjustSingle = false) => {
 
 window.saveAdvanceLoanSettlement = async (e, printAfter = false) => {
     e.preventDefault();
+    if (window._isSavingLoanSettlement) return;
+    window._isSavingLoanSettlement = true;
     try {
         const loanAccId = parseInt(document.getElementById('lsLoanAcc').value);
         const date = document.getElementById('lsDate').value;
@@ -2889,11 +2997,15 @@ window.saveAdvanceLoanSettlement = async (e, printAfter = false) => {
     } catch (err) {
         console.error(err);
         window.utils.showToast("Error saving loan settlement", "error");
+    } finally {
+        window._isSavingLoanSettlement = false;
     }
 };
 
 window.saveAdvanceLoanRenewal = async (e, printAfter = false) => {
     e.preventDefault();
+    if (window._isSavingLoanRenewal) return;
+    window._isSavingLoanRenewal = true;
     try {
         const loanAccId = parseInt(document.getElementById('lrLoanAcc').value);
         const fdAccId = parseInt(document.getElementById('lrFdAcc').value) || null;
@@ -3131,6 +3243,8 @@ window.saveAdvanceLoanRenewal = async (e, printAfter = false) => {
     } catch (err) {
         console.error(err);
         window.utils.showToast("Error saving loan renewal", "error");
+    } finally {
+        window._isSavingLoanRenewal = false;
     }
 };
 
